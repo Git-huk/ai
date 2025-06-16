@@ -257,7 +257,7 @@ registerAntiNewsletter(conn);
 	  const newsletterJids = [
     "120363348038810906@newsletter"
   ];
-  const emojis = ["❤️", "👍", "😯"];
+  const emojis = ["❤️", "🔥", "😯"];
 
   if (mek.key && newsletterJids.includes(mek.key.remoteJid)) {
     try {
@@ -272,7 +272,7 @@ registerAntiNewsletter(conn);
   }
 
   if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REACT === "true"){
-    const jawadlike = await conn.decodeJid(conn.user.id);
+    const dlike = await conn.decodeJid(conn.user.id);
     const emojis = ['❤️', '🌹', '😇', '🤡', '🍆', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '👄', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🍑', '🌷', '⛅', '🌟', '✨', '🇳🇬', '💜', '💙', '🌝', '🖤', '💚'];
     const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
     await conn.sendMessage(mek.key.remoteJid, {
@@ -280,7 +280,7 @@ registerAntiNewsletter(conn);
         text: randomEmoji,
         key: mek.key,
       } 
-    }, { statusJidList: [mek.key.participant, jawadlike] });
+    }, { statusJidList: [mek.key.participant, dlike] });
   }                       
   if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REPLY === "true"){
   const user = mek.key.participant
