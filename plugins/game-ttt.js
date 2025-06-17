@@ -59,7 +59,7 @@ cmd({
   }
 
   if (!isGroup) {
-    // چت خصوصی: دو بازیکن مشخص (فرستنده و ربات یا گیرنده)
+    // در چت خصوصی: دو بازیکن مشخص (فرستنده و گیرنده)
     const botNumber = conn.user.id.split(":")[0] + "@s.whatsapp.net";
     const opponent = from === sender ? botNumber : from;
 
@@ -80,16 +80,14 @@ cmd({
       { mentions: [sender, opponent] }
     );
 
+    // تایمر برای نوبت
     if (timers[from]) clearTimeout(timers[from]);
     timers[from] = setTimeout(() => {
       let db = loadDB();
       if (db[from] && !db[from].finished) {
         const mention1 = `@${db[from].players[0].split("@")[0]}`;
         const mention2 = `@${db[from].players[1].split("@")[0]}`;
-        conn.sendMessage(from, {
-          text: `⌛️ *Game timed out!*\nNo move was made within 1 minutes.\nGame between ${mention1} and ${mention2} cancelled.`,
-          mentions: db[from].players
-        });
+        conn.sendMessage(from, { text: `⌛️ *Game timed out!*\nNo move was made within 1 minutes.\nGame between ${mention1} and ${mention2} cancelled.`, mentions: db[from].players });
         delete db[from];
         saveDB(db);
         delete timers[from];
@@ -99,53 +97,7 @@ cmd({
     return;
   }
 
-  // گروه
-
-  // اگر منشن شده باشه بازی مستقیم با اون فرد شروع می‌شه
-  if (mentionedJid.length > 0) {
-    const opponent = mentionedJid[0];
-
-    if (opponent === sender) return reply("⚠️ You can't play against yourself.");
-    if (opponent === conn.user.id.split(":")[0] + "@s.whatsapp.net") return reply("🤖 I can't play with myself!");
-
-    db[from] = {
-      players: [sender, opponent],
-      waiting: false,
-      finished: false,
-      board: Array(9).fill(0),
-      turn: 1
-    };
-    saveDB(db);
-
-    const mention1 = `@${sender.split("@")[0]}`;
-    const mention2 = `@${opponent.split("@")[0]}`;
-
-    await reply(
-      `🎮 *Tic-Tac-Toe Game Started!*\n\n${gameMessage(db[from], mention1, mention2)}`,
-      null,
-      { mentions: [sender, opponent] }
-    );
-
-    if (timers[from]) clearTimeout(timers[from]);
-    timers[from] = setTimeout(() => {
-      let db = loadDB();
-      if (db[from] && !db[from].finished) {
-        const mention1 = `@${db[from].players[0].split("@")[0]}`;
-        const mention2 = `@${db[from].players[1].split("@")[0]}`;
-        conn.sendMessage(from, {
-          text: `⌛️ *Game timed out!*\nNo move was made within 1 minute.\nGame between ${mention1} and ${mention2} cancelled.`,
-          mentions: db[from].players
-        });
-        delete db[from];
-        saveDB(db);
-        delete timers[from];
-      }
-    }, 1 * 60 * 1000);
-
-    return;
-  }
-
-  // اگر منشن نبود، حالت انتظار برای join
+  // در گروه: حالت عادی با انتظار برای join
   db[from] = {
     players: [sender],
     waiting: true,
@@ -155,11 +107,7 @@ cmd({
   };
   saveDB(db);
 
-  await reply(
-    `🎮 *Tic-Tac-Toe* game started!\n\n👤 Player 1: @${sender.split("@")[0]}\n⏳ Waiting for player 2 to join...\n\n✉️ Send *join-ttt* to join the game!`,
-    null,
-    { mentions: [sender] }
-  );
+  await reply(`🎮 *Tic-Tac-Toe* game started!\n\n👤 Player 1: @${sender.split("@")[0]}\n⏳ Waiting for player 2 to join...\n\n✉️ Send *join-ttt* to join the game!`, null, { mentions: [sender] });
 
   if (waitingIntervals[from]) clearInterval(waitingIntervals[from]);
   if (waitingTimeouts[from]) clearTimeout(waitingTimeouts[from]);
