@@ -309,8 +309,7 @@ cmd({
             await conn.sendMessage(from, {
                 document: fs.readFileSync(zipPath),
                 mimetype: 'application/zip',
-                fileName: `${fileName}.zip`,
-                contextInfo: getNewsletterContext(m.sender)
+                fileName: `${fileName}.zip`
             }, { quoted: mek });
 
             fs.unlinkSync(zipPath); // حذف فایل zip پس از ارسال
@@ -319,8 +318,7 @@ cmd({
             await conn.sendMessage(from, {
                 document: fs.readFileSync(filePath),
                 mimetype: 'application/octet-stream',
-                fileName: fileName,
-                contextInfo: getNewsletterContext(m.sender)
+                fileName: fileName
             }, { quoted: mek });
         }
 
