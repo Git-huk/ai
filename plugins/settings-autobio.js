@@ -90,7 +90,7 @@ function startAutoBio(conn, bioText) {
             console.error('Bio update error:', error);
             stopAutoBio();
         }
-    }, 40000 * 86000);
+    }, 5 * 60 * 1000);
 }
 
 // Stop auto-bio updates
