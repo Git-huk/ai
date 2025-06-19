@@ -102,7 +102,7 @@ cmd({
         {
           header: 'Menu',
           title: cat.charAt(0).toUpperCase() + cat.slice(1),
-          description: `Click for Menu ${cat.charAt(0).toUpperCase() + cat.slice(1)}`,
+          description: `${cat.charAt(0).toUpperCase() + cat.slice(1)}`,
           id: `${prefix}showmenu ${cat}`
         }
       ]
@@ -110,7 +110,7 @@ cmd({
 
     if (index === 0) {
       section.title = "Select a menu";
-      section.highlight_label = '𝐀𝐢 𝐦𝐞𝐧𝐮';
+      section.highlight_label = '𝐦𝐨𝐝𝐞𝐫𝐚𝐭𝐢𝐨𝐧 𝐦𝐞𝐧𝐮';
     }
 
     return section;
@@ -118,7 +118,7 @@ cmd({
 
   // اگر پیام دکمه‌ای هست، همینجا هندل کن
   const buttonText = m.text?.toLowerCase();
-  if (buttonText === "💯ping" || buttonText === `${prefix}ping`) {
+  if (buttonText === `${prefix}Ping` || buttonText === `${prefix}ping`) {
     const start = new Date().getTime();
 
     const reactionEmojis = ['🔥', '⚡', '🚀', '💨', '🎯', '🎉', '🌟', '💥', '🕐', '🔹'];
