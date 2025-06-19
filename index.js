@@ -290,6 +290,18 @@ registerAntiNewsletter(conn);
             await Promise.all([
               saveMessage(mek),
             ]);
+	  
+	  conn.ev.on('call', async (call) => {
+    const callData = call[0]; // Get the first call object
+    if (callData.status === 'offer' && config.ANTI_CALL === "true") {
+        await conn.sendMessage(callData.from, {
+            text: "📞 𝙰𝚞𝚝𝚘 𝙲𝚊𝚕𝚕 𝚁𝚎𝚓𝚎𝚌𝚝 𝙼𝚘𝚍𝚎 𝙰𝚌𝚝𝚒𝚟𝚎.📵 𝙽𝚘 𝙲𝚊𝚕𝚕𝚜 𝙰𝚕𝚕𝚘𝚠𝚎𝚍!",
+            mentions: [callData.from],
+        });
+        await conn.rejectCall(callData.id, callData.from);
+    }
+});
+	  
   const m = sms(conn, mek)
   const type = getContentType(mek.message)
   const content = JSON.stringify(mek.message)
