@@ -20,7 +20,7 @@ async (conn, mek, m, { from, args, isCreator, reply }) => {
         config.ANTI_CALL = "false";
         return reply("Anti-call is now disabled.");
     } else {
-        return reply(`*🫟 ᴇxᴀᴍᴘʟᴇ:  ${config.PREFIX}anticall on*`);
+        return reply(`*Current settings*:- ${config.ANTI_CALL}\n\n*🫟 ᴇxᴀᴍᴘʟᴇ:  ${config.PREFIX}anticall on*`);
     }
 }); 
 
