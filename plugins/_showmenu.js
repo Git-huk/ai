@@ -103,7 +103,7 @@ cmd({
           header: 'Menu',
           title: cat.charAt(0).toUpperCase() + cat.slice(1),
           description: `This for ${cat.charAt(0).toLowerCase() + cat.slice(1)} commands`,
-          buttonid: `${prefix}showmenu ${cat.charAt(0).toLowerCase()`
+          buttonid: `${prefix}showmenu ${categories}`
         }
       ]
     };
