@@ -26,7 +26,7 @@ async (conn, mek, m, { from, args, isCreator, reply }) => {
 
 
 cmd({
-     on:"body"},async(conn, mek, m, {from, body, isGroup, isOwner, isAdmins, sender, quoted })=>{
+     on:"body"},async(conn, mek, m, {from, body, isGroup, isOwner, reply, sender, quoted })=>{
 try{
 conn.ev.on("call", async(json) => {
 	  if(config.ANTI_CALL === "true") { 
@@ -35,7 +35,7 @@ conn.ev.on("call", async(json) => {
     			if(id.isGroup == false) {
     				await conn.rejectCall(id.id, id.from);
 				
-				if ( mek.key.fromMe) return;
+				if ( mek.key.fromMe) return reply("*Calls not allowed please drop a message*.");
 	
     			} else {
     				await conn.rejectCall(id.id, id.from);
