@@ -1,30 +1,6 @@
 const { cmd } = require('../command');
 const config = require('../config');
 
-// Default values if not set in config
-config.ANTICALL = config.ANTICALL || "true"; // true/block/false
-config.ANTICALL_MSG = config.ANTICALL_MSG || "*No calls allowed*!";
-
-const Anticall = async (json, conn) => {
-   for (const id of json) {
-      if (id.status === 'offer') {
-         if (config.ANTICALL === "true") {
-            let msg = await conn.sendMessage(id.from, {
-               text: `${config.ANTICALL_MSG}`,
-               mentions: [id.from],
-            });
-            await conn.rejectCall(id.id, id.from);
-         } else if (config.ANTICALL === "block") {
-            let msg = await conn.sendMessage(id.from, {
-               text: `${config.ANTICALL_MSG}!`,
-               mentions: [id.from],
-            });
-            await conn.rejectCall(id.id, id.from); 
-            await conn.updateBlockStatus(id.from, "block");
-         }
-      }
-   }
-};
 
 cmd({
     pattern: "anticall",
@@ -57,22 +33,30 @@ Usage:
 → ${config.PREFIX}anticall msg [message]`);
     }
 });
-
-module.exports = {
-    Anticall,
-    anticallHandler: Anticall // For backward compatibility
-};
-// plugins/antispam.js
-const spamCount = {};
-
 cmd({
-    on: "text"
-}, (m) => {
-    const sender = m.sender;
-    spamCount[sender] = (spamCount[sender] || 0) + 1;
-    
-    if (spamCount[sender] > 3) {
-        m.reply("*You're spamming*!");
-        conn.updateBlockStatus(sender, "block");
-    }
-});
+     on:"body"},async(conn, mek, m, {from, body, isCmd,isGroup,isOwner,isAdmins,groupAdmins,isBotAdmins,sender,groupName,quoted})=>{
+try{
+conn.ev.on("call", async(json) => {
+	  if(config.ANTI_CALL === "true") { 
+    	for(const id of json) {
+    		if(id.status == "offer") {
+    			if(id.isGroup == false) {
+    				await conn.rejectCall(id.id, id.from);
+				
+				if ( mek.key.fromMe) return await conn.sendMessage(id.from, {
+    					text: `*Call rejected automatically because owner is busy ⚠️*`, 
+							mentions: [id.from]
+    				});
+	
+    			} else {
+    				await conn.rejectCall(id.id, id.from);
+    			}
+    		}
+    	}}
+    });
+} catch (e) {
+console.log(e)
+reply(e)
+}}
+)
+
