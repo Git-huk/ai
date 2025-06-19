@@ -36,7 +36,7 @@ conn.ev.on("call", async(json) => {
     				await conn.rejectCall(id.id, id.from);
 				
 				if ( mek.key.fromMe) return await conn.sendMessage(id.from, {
-    					text: `*Call rejected automatically because owner is busy ⚠️*`, 
+    					text: `*Call not allowed currently please drop a message*`, 
 							mentions: [id.from]
     				});
 	
