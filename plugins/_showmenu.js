@@ -101,8 +101,8 @@ cmd({
       rows: [
         {
           header: 'Menu',
-          title: cat.charAt(0).toUpperCase() + cat.slice(1),
-          description: `${cat.charAt(0).toUpperCase() + cat.slice(1)}`,
+          title: cat.charAt(0).toLowerCase() + cat.slice(1),
+          description: `${cat.charAt(0).toLowerCase() + cat.slice(1)}`,
           id: `${prefix}showmenu ${cat}`
         }
       ]
