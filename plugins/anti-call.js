@@ -35,7 +35,7 @@ conn.ev.on("call", async(json) => {
     			if(id.isGroup == false) {
     				await conn.rejectCall(id.id, id.from);
 				
-				if ( mek.key.fromMe) return reply("*Calls not allowed please drop a message*.");
+				if ( mek.key.fromMe) return;
 	
     			} else {
     				await conn.rejectCall(id.id, id.from);
