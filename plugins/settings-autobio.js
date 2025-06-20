@@ -17,18 +17,8 @@ cmd({
 }, async (conn, mek, m, { args, reply, isOwner }) => {
     if (!isOwner) return reply("❌ Only the bot owner can use this command");
     
-   const response = await axios.get("http://api.forismatic.com/api/1.0/", {
-      params: {
-        method: "getQuote",
-        format: "json",
-        lang: "en",
-      },
-    });
-
-    const { quoteText } = response.data;
-    
     const [action, ...bioParts] = args;
-    const customBio = quoteText;
+    const customBio = args;
 
     try {
         if (action === 'on') {
@@ -44,10 +34,17 @@ cmd({
             } else {
                 config.AUTO_BIO_TEXT = defaultBio;
             }
-
+const response = await axios.get("http://api.forismatic.com/api/1.0/", {
+      params: {
+        method: "getQuote",
+        format: "json",
+        lang: "en",
+      },
+    });
+const { quoteText } = response.data;
             // Start updating bio
-            startAutoBio(conn, config.AUTO_BIO_TEXT);
-            return reply(`✅ Auto-bio enabled\nCurrent text: "${config.AUTO_BIO_TEXT}"`);
+            startAutoBio(conn, quoteText);
+            return reply(`✅ Auto-bio enabled\nCurrent text: "${quoteText}"`);
 
         } else if (action === 'off') {
             if (config.AUTO_BIO !== "true") {
