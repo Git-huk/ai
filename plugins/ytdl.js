@@ -28,11 +28,11 @@ cmd({
     let downloadUrl = null;
 
     if (!cachedData) {
-      const apiUrl = `https://apis.davidcyriltech.my.id/youtube/mp3?url=${encodeURIComponent(song.url)}`;
+      const apiUrl = `https://apis.davidcyriltech.my.id/download/ytmp3?url=${encodeURIComponent(song.url)}`;
       const res = await fetch(apiUrl);
       const data = await res.json();
 
-      if (!data?.result?.downloadUrl) return reply("⛔ Download failed.", null, );
+      if (!data?.result?.download_url) return reply("⛔ Download failed.", null, );
 
       downloadUrl = data.result.downloadUrl;
 
