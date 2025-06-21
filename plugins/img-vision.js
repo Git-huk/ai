@@ -60,7 +60,7 @@ cmd({
     const msrg = q;
 
     if (!msrg) {
-      throw "give a message, eg `vision what's on this image` (the image you replied)";
+      return reply("give a message, eg `vision what's on this image` (the image you replied)");
     }
     
 
