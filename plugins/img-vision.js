@@ -32,9 +32,6 @@ cmd({
       return reply("Please reply to an image file (JPEG/PNG)");
     }
     
-    if (!q) {
-      return reply("reply to an image and make request, eg `.vision [reply image] what's on this image`");
-    }
 
     // Download the media
     const mediaBuffer = await quotedMsg.download();
