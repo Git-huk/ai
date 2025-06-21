@@ -31,6 +31,12 @@ cmd({
     if (!mimeType || !mimeType.startsWith('image/')) {
       return reply("Please reply to an image file (JPEG/PNG)");
     }
+
+    const msrg = q;
+
+    if (!msrg) {
+      return reply("give a message, eg `vision what's on this image` (the image you replied)");
+    }
     
 
     // Download the media
@@ -56,14 +62,7 @@ cmd({
     const uploadResponse = await axios.post("https://catbox.moe/user/api.php", form, {
       headers: form.getHeaders()
     });
-
-    const msrg = q;
-
-    if (!msrg) {
-      return reply("give a message, eg `vision what's on this image` (the image you replied)");
-    }
     
-
     const imageUrl = uploadResponse.data;
     fs.unlinkSync(tempFilePath); // Clean up temp file
 
