@@ -68,7 +68,7 @@ cmd({
     const scanUrl = `https://apis-keith.vercel.app/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(q)}`;
     const scanResponse = await axios.get(scanUrl);
 
-    if (!scanResponse.data.success) {
+    if (!scanResponse.data.result) {
       throw scanResponse.data.message || "Ai vision failed";
     }
 
