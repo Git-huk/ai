@@ -2,7 +2,7 @@ const axios = require('axios');
 const { cmd, commands } = require('../command');
 const config = require("../config");
 const { setConfig, getConfig } = require("../lib/configdb");
-const prefix = config.PREFIX;
+const { prefix } = config.PREFIX;
 
 // Default AI states
 let AI_STATE = {
