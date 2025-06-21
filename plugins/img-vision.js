@@ -72,7 +72,7 @@ cmd({
     }
 
     // Scan the image using the API
-    const scanUrl = `https://apis-keith.vercel.app/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(q)}`;
+    const scanUrl = `https://apis-keith.vercel.app/ai/gemini-vision?image=${encodeURIComponent(imageUrl)}&q=${encodeURIComponent(msrg)}`;
     const scanResponse = await axios.get(scanUrl);
 
     if (!scanResponse.data.result) {
