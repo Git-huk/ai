@@ -119,9 +119,10 @@ cmd({
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit',
+                timeZone: 'Africa/Lagos',
                 timeZoneName: 'short'
             };
-            const currentDateTime = now.toLocaleDateString('en-US', timeZone: 'Africa/Lagos', options);
+            const currentDateTime = now.toLocaleDateString('en-US', options);
             return reply(`Current Date & Time in Nigeria:\n${currentDateTime}`);
         }
 
