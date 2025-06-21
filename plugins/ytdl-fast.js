@@ -72,15 +72,15 @@ cmd({
         if (!yt.results.length) return reply("No results found!");
 
         const song = yt.results[0];
-        const apiUrl = `https://api.giftedtech.web.id/api/download/yta?apikey=gifted_api_6hf50c4j&url=${encodeURIComponent(song.url)}`;
+        const apiUrl = `https://apis-keith.vercel.app/download/dlmp3?url=${encodeURIComponent(song.url)}`;
         
         const res = await fetch(apiUrl);
         const data = await res.json();
 
-        if (!data?.result?.download_url) return reply("Download failed. Try again later.");
+        if (!data?.result?.downloadUrl) return reply("Download failed. Try again later.");
 
     await conn.sendMessage(from, {
-    audio: { url: data.result.download_url },
+    audio: { url: data.result.downloadUrl },
     mimetype: "audio/mpeg",
     fileName: `${song.title}.mp3`}, { quoted: mek });
 
