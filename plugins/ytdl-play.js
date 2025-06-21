@@ -17,12 +17,12 @@ cmd({
         await reply("⏳ Downloading audio...");
 
         // Use API to get audio
-        const apiUrl = `https://apis.davidcyriltech.my.id/play?query=${encodeURIComponent(q)}`;
+        const apiUrl = `https://apis-keith.vercel.app/download/spotify?q=${encodeURIComponent(q)}`;
         const response = await fetch(apiUrl);
         const data = await response.json();
 
         await conn.sendMessage(from, {
-            audio: { url: data.result.download_url },
+            audio: { url: data.result.track.downloadLink },
             mimetype: 'audio/mpeg',
             ptt: false
         }, { quoted: mek });
