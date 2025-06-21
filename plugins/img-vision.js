@@ -22,7 +22,7 @@ cmd({
   category: "ai",
   use: ".vision [reply to image] improvise",
   filename: __filename
-}, async (client, message, { reply, q, quoted }) => {
+}, async (client, message, { reply, args, quoted }) => {
   try {
     // Check if quoted message exists and has media
     const quotedMsg = quoted || message;
@@ -32,7 +32,7 @@ cmd({
       return reply("Please reply to an image file (JPEG/PNG)");
     }
 
-    const msrg = q;
+    const msrg = args;
 
     if (!msrg) {
       return reply("give a message, eg `vision what's on this image` (the image you replied)");
