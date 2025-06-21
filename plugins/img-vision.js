@@ -22,7 +22,7 @@ cmd({
   category: "ai",
   use: ".vision [reply to image] improvise",
   filename: __filename
-}, async (client, message, { reply, args, quoted }) => {
+}, async (client, message, { reply, q, quoted }) => {
   try {
     // Check if quoted message exists and has media
     const quotedMsg = quoted || message;
@@ -32,13 +32,8 @@ cmd({
       return reply("Please reply to an image file (JPEG/PNG)");
     }
 
-    const msrg = args;
-
-    if (!msrg) {
-      return reply("give a message, eg `vision what's on this image` (the image you replied)");
-    }
+    const msrg = q;
     
-
     // Download the media
     const mediaBuffer = await quotedMsg.download();
     const fileSize = formatBytes(mediaBuffer.length);
@@ -75,7 +70,7 @@ cmd({
     const scanResponse = await axios.get(scanUrl);
 
     if (!scanResponse.data.result) {
-      throw scanResponse.data.message || "Ai vision failed";
+      throw scanResponse.data.message || "Ai vision failed, Tell the ai what to do with the image";
     }
 
     // Format the response
