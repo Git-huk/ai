@@ -57,6 +57,13 @@ cmd({
       headers: form.getHeaders()
     });
 
+    const msrg = q;
+
+    if (!msrg) {
+      throw "give a message, eg `vision what's on this image` (the image you replied)";
+    }
+    
+
     const imageUrl = uploadResponse.data;
     fs.unlinkSync(tempFilePath); // Clean up temp file
 
