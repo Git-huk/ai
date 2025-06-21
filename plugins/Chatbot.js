@@ -2,7 +2,6 @@ const axios = require('axios');
 const { cmd, commands } = require('../command');
 const config = require("../config");
 const { setConfig, getConfig } = require("../lib/configdb");
-const { prefix } = config.PREFIX;
 
 // Default AI states
 let AI_STATE = {
@@ -19,6 +18,7 @@ cmd({
     react: "✅"
 }, async (conn, mek, m, { from, args, isOwner, reply, prefix }) => {
     if (!isOwner) return reply("Command reserved for owner only*");
+    const commandPrefix = config.PREFIX;
 
     const mode = args[0]?.toLowerCase();
     const target = args[1]?.toLowerCase();
@@ -56,13 +56,13 @@ cmd({
     } else {
         return reply(`*Ai command assist*
             
-> ${prefix}chatbot on all - Enable AI in all chats
-> ${prefix}chatbot on pm - Enable AI in inbox only
-> ${prefix}chatbot on gc - Enable AI in groups only
+> ${commandPrefix}chatbot on all - Enable AI in all chats
+> ${commandPrefix}chatbot on pm - Enable AI in inbox only
+> ${commandPrefix}chatbot on gc - Enable AI in groups only
 *Disable Settings ❌*
-> ${prefix}chatbot off all - Disable AI in all chats
-> ${prefix}chatbot off pm - Disable AI in inbox only
-> ${prefix}chatbot off gc - Disable AI in groups only`);
+> ${commandPrefix}chatbot off all - Disable AI in all chats
+> ${commandPrefix}chatbot off pm - Disable AI in inbox only
+> ${commandPrefix}chatbot off gc - Disable AI in groups only`);
     }
 });
 
