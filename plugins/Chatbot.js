@@ -55,6 +55,9 @@ cmd({
         }
     } else {
         return reply(`*Ai command assist*
+
+*CURRENT MODE* IB-: ${AI_STATE.IB === "true" ? "ON" : "OFF"}
+*CURRENT MODE* GC-: ${AI_STATE.GC === "true" ? "ON" : "OFF"}
             
 > ${commandPrefix}chatbot on all - Enable AI in all chats
 > ${commandPrefix}chatbot on pm - Enable AI in inbox only
