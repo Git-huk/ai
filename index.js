@@ -80,7 +80,6 @@ const { setupLinkDetection } = require("./lib/events/antilinkDetection")
   const bodyparser = require('body-parser')
   const os = require('os')
   const Crypto = require('crypto')
-  const path = require('path')
   const prefix = config.PREFIX
   const ownerNumber = ['2349133354644']
 
