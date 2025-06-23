@@ -78,24 +78,7 @@ cmd({
         const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
         if (quoted !== botJid) return;
 
-        // Time/date shortcut
-        const lower = body.toLowerCase();
-        if (lower.includes("time") || lower.includes("date")) {
-            const now = new Date();
-            const current = now.toLocaleString("en-NG", {
-                timeZone: "Africa/Lagos",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric"
-            });
-            return reply(`🕒 Current Time in Nigeria:\n${current}`);
-        }
-
-        // 🔗 Call AI backend
+        // 🔗 Call AI backend (which now handles time/date)
         const { data } = await axios.post('https://xylo-ai.onrender.com/ask', {
             userId: sender,
             message: body
