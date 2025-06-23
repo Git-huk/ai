@@ -28,7 +28,7 @@ cmd({
 
     if (malePp) {
       await conn.sendMessage(from, {
-        'image': { 'url': malePlp },
+        'image': { 'url': malePp },
         'caption': "👨 Male Couple Profile Picture"
       }, { 'quoted': m });
     }
