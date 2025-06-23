@@ -458,20 +458,25 @@ const isBanned = bannedUsers.includes(sender);
 if (isBanned) return; // Ignore banned users completely
 	  
 
+// 🔐 Load owner data
 const ownerFile = JSON.parse(fs.readFileSync('./lib/owner.json', 'utf-8'));
 const ownerNumberFormatted = `2347013349642@s.whatsapp.net`;
+
 const isFileOwner = ownerFile.includes(sender);
 const isRealOwner = sender === ownerNumberFormatted || isMe || isFileOwner;
 
-const isMentioned = mek.message?.extendedTextMessage?.contextInfo?.mentionedJid?.includes(botNumber2)
+// 🔎 Safely extract contextInfo
+const contextInfo = mek.message?.extendedTextMessage?.contextInfo;
+
+const isMentioned = contextInfo?.mentionedJid?.includes(botNumber2)
                  || body.includes(botNumber2.split('@')[0]);
 
-const isReplyToBot = mek.message?.extendedTextMessage?.contextInfo?.participant === botNumber2;
+const isReplyToBot = contextInfo?.participant === botNumber2;
 
 const aiInboxOn = AI_STATE?.IB === "true";
 const aiGroupOn = AI_STATE?.GC === "true";
 
-// Custom fallback control
+// 🔒 Control bot response access
 if (!(isRealOwner || isCreator)) {
   if (config.MODE === "private") {
     if (isGroup) return;
@@ -485,6 +490,7 @@ if (!(isRealOwner || isCreator)) {
   }
 }
 
+// 🚫 Block mode mismatch
 if (!isRealOwner && isGroup && config.MODE === "inbox") return;
 if (!isRealOwner && !isGroup && config.MODE === "groups") return;	  
 	  // take commands 
