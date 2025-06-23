@@ -128,7 +128,6 @@ async function loadSession() {
       
         console.log('Downloading session data...');
 
-        // If SESSION_ID starts with "SUBZERO-MD~" - use Koyeb download
         if (config.SESSION_ID.startsWith('XBOT-MD**')) {
             console.log('Downloading Xcall session...');
             const sessdata = config.SESSION_ID.replace("XBOT-MD**", '');
@@ -198,6 +197,7 @@ async function connectToWA() {
         version,
         getMessage: async () => ({})
     });
+	conn.ev.setMaxListeners(100); // Raise the event listener limit
     
     // ... rest of your existing connectToWA code ...
 
