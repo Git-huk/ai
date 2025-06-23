@@ -24,7 +24,7 @@ cmd({
         const audio = await audioEditor.deep(buffer, ext);
 
         await client.sendMessage(from, {
-            audio: audio,
+            audio: audioo,
             mimetype: 'audio/mpeg'
         }, { quoted: message });
         await client.sendMessage(from, { react: { text: '✅', key: message.key } });
