@@ -1,4 +1,4 @@
-/*const axios = require('axios');
+const axios = require('axios');
 const { cmd } = require('../command');
 const config = require("../config");
 const { setConfig, getConfig } = require("../lib/configdb");
@@ -149,4 +149,4 @@ const duration = Math.floor(Math.random() * 1500) + 1500;
         reply("⚠️ Xylo AI error occurred.");
     }
 });
-*/
+
