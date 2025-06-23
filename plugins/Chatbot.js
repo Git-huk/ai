@@ -69,23 +69,26 @@ cmd({
     try {
         if (!body || m.key.fromMe || body.startsWith(config.PREFIX)) return;
 
-        // Only respond if AI is enabled
         const allowed = isGroup ? AI_STATE.GC === "true" : AI_STATE.IB === "true";
         if (!allowed) return;
 
-        // Only reply if message is replying to bot
+        // Only reply if the message is replying to the bot
         const quoted = m?.message?.extendedTextMessage?.contextInfo?.participant;
         const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
         if (quoted !== botJid) return;
 
-        // 🔗 Call AI backend (which now handles time/date)
+        // Simulate typing
+        const duration = Math.floor(Math.random() * 1500) + 1500;
+        await simulateTyping(conn, from, duration);
+
+        // Call AI backend
         const { data } = await axios.post('https://xylo-ai.onrender.com/ask', {
             userId: sender,
             message: body
         });
 
         if (data?.reply) {
-            await conn.sendMessage(from, { text: data.reply }, { quoted: m });
+            await conn.sendMessage(from, { text: data.reply, ai: true }, { quoted: m });
         } else {
             reply("⚠️ No reply from Xylo.");
         }
