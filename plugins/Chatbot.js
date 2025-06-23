@@ -75,7 +75,7 @@ cmd({
     if (savedState) AI_STATE = JSON.parse(savedState);
 })();
 
-// AI Chatbot by DavidX
+// AI Chatbot by DavidX — now powered by your own backend
 cmd({
     on: "body"
 }, async (conn, m, store, {
@@ -89,65 +89,44 @@ cmd({
     quotedMsg
 }) => {
     try {
-        // Check if message is a reply
-        if (!m?.message?.extendedTextMessage?.contextInfo?.participant) {
-            return; // Not a reply, ignore
-        }
-        
-        // Check if the reply is to the bot's message
+        // Only reply to messages that reply to the bot
+        if (!m?.message?.extendedTextMessage?.contextInfo?.participant) return;
+
         const repliedTo = m.message.extendedTextMessage.contextInfo.participant;
         const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
-        if (repliedTo !== botJid) {
-            return; // Not replying to the bot, ignore
-        }
+        if (repliedTo !== botJid) return;
 
-        // Check if AI is enabled for this chat type
+        // Respect AI enable state
         const isInbox = !isGroup;
-        if ((isInbox && AI_STATE.IB !== "true") || (isGroup && AI_STATE.GC !== "true")) {
-            return;
-        }
+        if ((isInbox && AI_STATE.IB !== "true") || (isGroup && AI_STATE.GC !== "true")) return;
 
-        // Optional: Prevent bot responding to its own messages or commands
+        // Skip if it's a command or from bot
         if (!body || m.key.fromMe || body.startsWith(config.PREFIX)) return;
 
-        // Handle time/date questions directly
+        // Special case: date or time
         const lowerBody = body.toLowerCase();
         if (lowerBody.includes('time') || lowerBody.includes('date')) {
             const now = new Date();
             const options = { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                timeZone: 'Africa/Lagos',
-                timeZoneName: 'short'
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                timeZone: 'Africa/Lagos', timeZoneName: 'short'
             };
             const currentDateTime = now.toLocaleDateString('en-US', options);
-            return reply(`Current Date & Time in Nigeria:\n${currentDateTime}`);
+            return reply(`📅 *Current Date & Time (Nigeria)*:\n${currentDateTime}`);
         }
 
-        // Encode message for the query
-        const query = encodeURIComponent(body);
-        const prompt = encodeURIComponent("You are Xylo, a friendly and helpful assistant made by DavidX, About DavidX, he's a tech genius from Nigeria who's age is personal and real name  David promise, more info to get at https://github.com/Mek-d1/X-BOT-MD. You provide concise, accurate, and helpful responses while maintaining a conversational tone. You do not refuse to answer questions unless they involve illegal activities, harm, or explicit content. When responding in a WhatsApp chat context, keep your answers relatively concise but complete.");
+        // Send message to your Render backend AI
+        const res = await axios.post('https://xylo-ai.onrender.com/ask', {
+            userId: sender,
+            message: body
+        });
 
-        // BK9 API Request
-        const apiUrl = `https://bk9.fun/ai/BK93?BK9=${prompt}&q=${query}`;
-
-        const { data } = await axios.get(apiUrl);
-
-        if (data && data.status && data.BK9) {
-            await conn.sendMessage(from, {
-                text: data.BK9
-            }, { quoted: m });
-        } else {
-            reply("Failed to generate a response from Ai");
-        }
+        const aiReply = res.data.reply || "❌ AI didn't respond.";
+        await conn.sendMessage(from, { text: aiReply }, { quoted: m });
 
     } catch (err) {
         console.error("AI Chatbot Error:", err.message);
-        reply("An error occurred while contacting the AI.");
+        reply("❌ AI error. Please try again later.");
     }
 });
