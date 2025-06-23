@@ -59,12 +59,6 @@ console.error = (...args) => {
 };
 
   const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson } = require('./lib/functions')
-const simulateTyping = async (conn, jid, duration = 2000) => {
-  await conn.sendPresenceUpdate('composing', jid); // show typing
-  await sleep(duration); // wait
-  await conn.sendPresenceUpdate('paused', jid); // stop typing
-};
-
   const { AntiDelDB, initializeAntiDeleteSettings, setAnti, getAnti, getAllAntiDeleteSettings, saveContact, loadMessage, getName, getChatSummary, saveGroupMetadata, getGroupMetadata, saveMessageCount, getInactiveGroupMembers, getGroupMembersMessageCount, saveMessage } = require('./data')
   const axios = require('axios')
   const config = require('./config')
@@ -256,6 +250,12 @@ async function connectToWA() {
     });
 
     conn.ev.on('creds.update', saveCreds);
+
+	const simulateTyping = async (conn, jid, duration = 2000) => {
+  await conn.sendPresenceUpdate('composing', jid); // show typing
+  await sleep(duration); // wait
+  await conn.sendPresenceUpdate('paused', jid); // stop typing
+};
 
     
 
