@@ -439,9 +439,15 @@ if (isBanned) return; // Ignore banned users completely
   
   try {
   cmd.function(conn, mek, m,{from, quoted, body, isCmd, command, args, q, text, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, isCreator, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply});
-  } catch (e) {
-  console.error("[PLUGIN ERROR] " + e);
-  }
+} catch (e) {
+  const rawStack = e.stack || e.message || String(e);
+  const firstLine = rawStack.split('\n')[0];
+  const pluginFile = (rawStack.match(/plugins[\\/](\w+)\.js/) || [])[1] || "unknown";
+
+  const errMsg = `[PLUGIN ERROR] in plugins/${pluginFile}: ${firstLine}`;
+  console.error(errMsg);
+  reply(errMsg);
+}
   }
   }
   events.commands.map(async(command) => {
