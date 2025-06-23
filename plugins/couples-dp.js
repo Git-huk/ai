@@ -19,7 +19,7 @@ cmd({
     
     const response = await axios.get("https://api.davidcyriltech.my.id/couplepp");
 
-    if (!response.datta || !response.data.success) {
+    if (!response.data || !response.data.success) {
       return reply("❌ Failed to fetch couple profile pictures. Please try again later.");
     }
 
@@ -28,7 +28,7 @@ cmd({
 
     if (malePp) {
       await conn.sendMessage(from, {
-        'image': { 'url': malePp },
+        'image': { 'url': malePlp },
         'caption': "👨 Male Couple Profile Picture"
       }, { 'quoted': m });
     }
