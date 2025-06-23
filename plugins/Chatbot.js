@@ -1,12 +1,11 @@
 const axios = require('axios');
-const { cmd, commands } = require('../command');
+const { cmd } = require('../command');
 const config = require("../config");
 const { setConfig, getConfig } = require("../lib/configdb");
 
-// Default AI states
 let AI_STATE = {
-    IB: "false", // Inbox chats
-    GC: "false"  // Group chats
+    IB: "false", // Inbox
+    GC: "false"  // Group
 };
 
 cmd({
@@ -15,10 +14,9 @@ cmd({
     desc: "Enable or disable AI chatbot responses",
     category: "ai",
     filename: __filename,
-    react: "✅"
-}, async (conn, mek, m, { from, args, isOwner, reply, prefix }) => {
-    if (!isOwner) return reply("Command reserved for owner only*");
-    const commandPrefix = config.PREFIX;
+    react: "🤖"
+}, async (conn, mek, m, { from, args, isOwner, reply }) => {
+    if (!isOwner) return reply("❌ Only the bot owner can use this command.");
 
     const mode = args[0]?.toLowerCase();
     const target = args[1]?.toLowerCase();
@@ -27,106 +25,89 @@ cmd({
         if (!target || target === "all") {
             AI_STATE.IB = "true";
             AI_STATE.GC = "true";
-            await setConfig("AI_STATE", JSON.stringify(AI_STATE));
-            return reply("*Xylo is now enabled for both inbox and group chats*");
         } else if (target === "pm") {
             AI_STATE.IB = "true";
-            await setConfig("AI_STATE", JSON.stringify(AI_STATE));
-            return reply("*Xylo is now enabled for inbox chats*");
         } else if (target === "gc") {
             AI_STATE.GC = "true";
-            await setConfig("AI_STATE", JSON.stringify(AI_STATE));
-            return reply("*Xylo is now enabled for group chats*");
         }
+        await setConfig("AI_STATE", JSON.stringify(AI_STATE));
+        return reply("✅ Xylo AI enabled for " + (target || "all") + " chats.");
     } else if (mode === "off") {
         if (!target || target === "all") {
             AI_STATE.IB = "false";
             AI_STATE.GC = "false";
-            await setConfig("AI_STATE", JSON.stringify(AI_STATE));
-            return reply("*Xylo is now disabled for both inbox and group chats*");
         } else if (target === "pm") {
             AI_STATE.IB = "false";
-            await setConfig("AI_STATE", JSON.stringify(AI_STATE));
-            return reply("*Xylo is now disabled for inbox chats*");
         } else if (target === "gc") {
             AI_STATE.GC = "false";
-            await setConfig("AI_STATE", JSON.stringify(AI_STATE));
-            return reply("*Xylo is now disabled for group chats*");
         }
+        await setConfig("AI_STATE", JSON.stringify(AI_STATE));
+        return reply("❌ Xylo AI disabled for " + (target || "all") + " chats.");
     } else {
-        return reply(`*Ai command assist*
-
-*CURRENT MODE* IB-: ${AI_STATE.IB === "true" ? "ON" : "OFF"}
-*CURRENT MODE* GC-: ${AI_STATE.GC === "true" ? "ON" : "OFF"}
-            
-> ${commandPrefix}chatbot on all - Enable AI in all chats
-> ${commandPrefix}chatbot on pm - Enable AI in inbox only
-> ${commandPrefix}chatbot on gc - Enable AI in groups only
-*Disable Settings ❌*
-> ${commandPrefix}chatbot off all - Disable AI in all chats
-> ${commandPrefix}chatbot off pm - Disable AI in inbox only
-> ${commandPrefix}chatbot off gc - Disable AI in groups only`);
+        return reply(`🤖 *Xylo AI Control Panel*\n\n` +
+            `📥 PM: ${AI_STATE.IB === "true" ? "✅ On" : "❌ Off"}\n` +
+            `👥 Group: ${AI_STATE.GC === "true" ? "✅ On" : "❌ Off"}\n\n` +
+            `Usage:\n${config.PREFIX}chatbot on|off all|pm|gc`);
     }
 });
 
-// Initialize AI state on startup
+// Load AI state on startup
 (async () => {
-    const savedState = await getConfig("AI_STATE");
-    if (savedState) AI_STATE = JSON.parse(savedState);
+    const saved = await getConfig("AI_STATE");
+    if (saved) AI_STATE = JSON.parse(saved);
 })();
 
-// AI Chatbot by DavidX — now powered by your own backend
 cmd({
     on: "body"
 }, async (conn, m, store, {
     from,
     body,
-    sender,
     isGroup,
-    isBotAdmins,
-    isAdmins,
-    reply,
-    quotedMsg
+    sender,
+    reply
 }) => {
     try {
-        // Only reply to messages that reply to the bot
-        if (!m?.message?.extendedTextMessage?.contextInfo?.participant) return;
-
-        const repliedTo = m.message.extendedTextMessage.contextInfo.participant;
-        const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
-        if (repliedTo !== botJid) return;
-
-        // Respect AI enable state
-        const isInbox = !isGroup;
-        if ((isInbox && AI_STATE.IB !== "true") || (isGroup && AI_STATE.GC !== "true")) return;
-
-        // Skip if it's a command or from bot
         if (!body || m.key.fromMe || body.startsWith(config.PREFIX)) return;
 
-        // Special case: date or time
-        const lowerBody = body.toLowerCase();
-        if (lowerBody.includes('time') || lowerBody.includes('date')) {
+        // Only respond if AI is enabled
+        const allowed = isGroup ? AI_STATE.GC === "true" : AI_STATE.IB === "true";
+        if (!allowed) return;
+
+        // Only reply if message is replying to bot
+        const quoted = m?.message?.extendedTextMessage?.contextInfo?.participant;
+        const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
+        if (quoted !== botJid) return;
+
+        // Time/date shortcut
+        const lower = body.toLowerCase();
+        if (lower.includes("time") || lower.includes("date")) {
             const now = new Date();
-            const options = { 
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-                hour: '2-digit', minute: '2-digit', second: '2-digit',
-                timeZone: 'Africa/Lagos', timeZoneName: 'short'
-            };
-            const currentDateTime = now.toLocaleDateString('en-US', options);
-            return reply(`📅 *Current Date & Time (Nigeria)*:\n${currentDateTime}`);
+            const current = now.toLocaleString("en-NG", {
+                timeZone: "Africa/Lagos",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric"
+            });
+            return reply(`🕒 Current Time in Nigeria:\n${current}`);
         }
 
-        // Send message to your Render backend AI
-        const res = await axios.post('https://xylo-ai.onrender.com/ask', {
+        // 🔗 Call AI backend
+        const { data } = await axios.post('https://xylo-ai.onrender.com/ask', {
             userId: sender,
             message: body
         });
 
-        const aiReply = res.data.reply || "❌ AI didn't respond.";
-        await conn.sendMessage(from, { text: aiReply }, { quoted: m });
-
+        if (data?.reply) {
+            await conn.sendMessage(from, { text: data.reply }, { quoted: m });
+        } else {
+            reply("⚠️ No reply from Xylo.");
+        }
     } catch (err) {
-        console.error("AI Chatbot Error:", err.message);
-        reply("❌ AI error. Please try again later.");
+        console.error("AI Chat Error:", err.message);
+        reply("⚠️ Xylo AI error occurred.");
     }
 });
