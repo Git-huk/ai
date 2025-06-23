@@ -458,15 +458,14 @@ const isBanned = bannedUsers.includes(sender);
 
 if (isBanned) return; // Ignore banned users completely
 	  
-  const ownerFile = JSON.parse(fs.readFileSync('./lib/owner.json', 'utf-8'));  // خواندن فایل
-  const ownerNumberFormatted = `2347013349642@s.whatsapp.net`;
-  // بررسی اینکه آیا فرستنده در owner.json موجود است
-  const isFileOwner = ownerFile.includes(sender);
-  const isRealOwner = sender === ownerNumberFormatted || isMe || isFileOwner;
-  // اعمال شرایط بر اساس وضعیت مالک
-  
+
+const ownerFile = JSON.parse(fs.readFileSync('./lib/owner.json', 'utf-8'));
+const ownerNumberFormatted = `2347013349642@s.whatsapp.net`;
+const isFileOwner = ownerFile.includes(sender);
+const isRealOwner = sender === ownerNumberFormatted || isMe || isFileOwner;
+
 const isMentioned = mek.message?.extendedTextMessage?.contextInfo?.mentionedJid?.includes(botNumber2)
-                  || body.includes(botNumber2.split('@')[0]);
+                 || body.includes(botNumber2.split('@')[0]);
 
 const isReplyToBot = mek.message?.extendedTextMessage?.contextInfo?.participant === botNumber2;
 
@@ -474,34 +473,21 @@ const aiInboxOn = AI_STATE?.IB === "true";
 const aiGroupOn = AI_STATE?.GC === "true";
 
 // Custom fallback control
-
-if ((!isRealOwner || !isCreator)) {
+if (!(isRealOwner || isCreator)) {
   if (config.MODE === "private") {
     if (isGroup) return;
-    if ((!isMentioned || !isReplyToBot) || !aiInboxOn) return;
+    if (!(isMentioned || isReplyToBot) || !aiInboxOn) return;
   }
   if (config.MODE === "inbox" && isGroup) {
-    if ((!isMentioned || !isReplyToBot) || !aiInboxOn) return;
+    if (!(isMentioned || isReplyToBot) || !aiInboxOn) return;
   }
   if (config.MODE === "groups" && !isGroup) {
-    if ((!isMentioned || !isReplyToBot) || !aiGroupOn) return;
-  }
-}
- // no group allowed in private mode
-    if ((!isMentioned || !isReplyToBot) || !aiInboxOn) return;
-  }
-  if (config.MODE === "inbox" && isGroup) {
-    if ((!isMentioned || !isReplyToBot) || !aiInboxOn) return;
-  }
-  if (config.MODE === "groups" && !isGroup) {
-    if ((!isMentioned || !isReplyToBot) || !aiGroupOn) return;
+    if (!(isMentioned || isReplyToBot) || !aiGroupOn) return;
   }
 }
 
-  if (!isRealOwner && isGroup && config.MODE === "inbox") return;
-  if (!isRealOwner && !isGroup && config.MODE === "groups") return;
- 
-	  
+if (!isRealOwner && isGroup && config.MODE === "inbox") return;
+if (!isRealOwner && !isGroup && config.MODE === "groups") return;	  
 	  // take commands 
                  
   const events = require('./command')
