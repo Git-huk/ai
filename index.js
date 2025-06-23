@@ -492,7 +492,7 @@ if (!(isRealOwner || isCreator)) {
   }
   if (config.MODE === "inbox" && isGroup) {
     if (!(isMentioned || isReplyToBot) || !aiInboxOn) return;
-  }
+  
   if (config.MODE === "groups" && !isGroup) {
     if (!(isMentioned || isReplyToBot) || !aiGroupOn) return;
   }
