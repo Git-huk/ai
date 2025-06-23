@@ -204,8 +204,6 @@ async function connectToWA() {
         getMessage: async () => ({})
     });
     
-    conn.ev.setMaxListeners(100); // Raise the event listener limit
-    
     // ... rest of your existing connectToWA code ...
 
 	
