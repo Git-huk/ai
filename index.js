@@ -88,8 +88,9 @@ const { setupLinkDetection } = require("./lib/events/antilinkDetection")
   const Crypto = require('crypto')
   const prefix = config.PREFIX
   const ownerNumber = ['2349133354644']
+require('events').EventEmitter.defaultMaxListeners = 100;
 
-  //=============================================
+//=============================================
   const tempDir = path.join(os.tmpdir(), 'cache-temp')
   if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir)
