@@ -475,26 +475,26 @@ const aiGroupOn = AI_STATE?.GC === "true";
 
 // Custom fallback control
 
-if (!(isRealOwner || isCreator)) {
+if ((!isRealOwner || !isCreator)) {
   if (config.MODE === "private") {
     if (isGroup) return;
-    if (!(isMentioned || isReplyToBot) || !aiInboxOn) return;
+    if ((!isMentioned || !isReplyToBot) || !aiInboxOn) return;
   }
   if (config.MODE === "inbox" && isGroup) {
-    if (!(isMentioned || isReplyToBot) || !aiInboxOn) return;
+    if ((!isMentioned || !isReplyToBot) || !aiInboxOn) return;
   }
   if (config.MODE === "groups" && !isGroup) {
-    if (!(isMentioned || isReplyToBot) || !aiGroupOn) return;
+    if ((!isMentioned || !isReplyToBot) || !aiGroupOn) return;
   }
 }
  // no group allowed in private mode
-    if (!(isMentioned || isReplyToBot) || !aiInboxOn) return;
+    if ((!isMentioned || !isReplyToBot) || !aiInboxOn) return;
   }
   if (config.MODE === "inbox" && isGroup) {
-    if (!(isMentioned || isReplyToBot) || !aiInboxOn) return;
+    if ((!isMentioned || !isReplyToBot) || !aiInboxOn) return;
   }
   if (config.MODE === "groups" && !isGroup) {
-    if (!(isMentioned || isReplyToBot) || !aiGroupOn) return;
+    if ((!isMentioned || !isReplyToBot) || !aiGroupOn) return;
   }
 }
 
