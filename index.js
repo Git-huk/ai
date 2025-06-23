@@ -473,6 +473,10 @@ const isMentioned = contextInfo?.mentionedJid?.includes(botNumber2)
 
 const isReplyToBot = contextInfo?.participant === botNumber2;
 
+	  const { getConfig } = require('./lib/configdb');
+
+	  getConfig("AI_STATE");
+
 const aiInboxOn = AI_STATE?.IB === "true";
 const aiGroupOn = AI_STATE?.GC === "true";
 
