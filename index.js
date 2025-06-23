@@ -251,14 +251,6 @@ async function connectToWA() {
 
     conn.ev.on('creds.update', saveCreds);
 
-	const simulateTyping = async (conn, jid, duration = 2000) => {
-  await conn.sendPresenceUpdate('composing', jid); // show typing
-  await sleep(duration); // wait
-  await conn.sendPresenceUpdate('paused', jid); // stop typing
-};
-
-    
-
 
 // =====================================
 	 
