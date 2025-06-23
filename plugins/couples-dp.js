@@ -19,7 +19,7 @@ cmd({
     
     const response = await axios.get("https://api.davidcyriltech.my.id/couplepp");
 
-    if (!response.data || !response.data.success) {
+    if (!response.datta || !response.data.success) {
       return reply("❌ Failed to fetch couple profile pictures. Please try again later.");
     }
 
