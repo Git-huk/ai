@@ -5,6 +5,13 @@ const { setConfig, getConfig } = require("../lib/configdb");
 const fs = require('fs');
 const { downloadTempMedia, cleanupTemp } = require("../lib/media-utils");
 
+// ✅ Add simulateTyping function here
+const simulateTyping = async (conn, jid, ms = 2000) => {
+  await conn.sendPresenceUpdate('composing', jid);
+  await new Promise(resolve => setTimeout(resolve, ms));
+  await conn.sendPresenceUpdate('paused', jid);
+};
+
 let AI_STATE = {
     IB: "false",
     GC: "false"
@@ -48,13 +55,10 @@ cmd({
     } else {
         return reply(`🤖 *Xylo AI Control Panel*
 
-` +
-            `📥 PM: ${AI_STATE.IB === "true" ? "✅ On" : "❌ Off"}
-` +
-            `👥 Group: ${AI_STATE.GC === "true" ? "✅ On" : "❌ Off"}
+📥 PM: ${AI_STATE.IB === "true" ? "✅ On" : "❌ Off"}
+👥 Group: ${AI_STATE.GC === "true" ? "✅ On" : "❌ Off"}
 
-` +
-            `Usage:
+Usage:
 ${config.PREFIX}chatbot on|off all|pm|gc`);
     }
 });
@@ -97,8 +101,7 @@ cmd({
             fs.unlinkSync(audioBuffer); // clean
         }
 
-        
-        // Image Generation
+        // 🖼️ Image Generation
         if (body.toLowerCase().startsWith("draw ")) {
             const prompt = body.slice(5).trim();
             const { data: draw } = await axios.post('https://xylo-ai.onrender.com/draw', {
@@ -110,7 +113,7 @@ cmd({
             return;
         }
 
-        // Video Generation
+        // 🎬 Video Generation
         if (body.toLowerCase().startsWith("video ")) {
             const prompt = body.slice(6).trim();
             const { data: vid } = await axios.post('https://xylo-ai.onrender.com/video', {
@@ -122,9 +125,11 @@ cmd({
             return;
         }
 
-const duration = Math.floor(Math.random() * 1500) + 1500;
+        // ⌨️ Simulate Typing
+        const duration = Math.floor(Math.random() * 1500) + 1500;
         await simulateTyping(conn, from, duration);
 
+        // 🤖 AI Chat Response
         const { data } = await axios.post('https://xylo-ai.onrender.com/ask', {
             userId: sender,
             message: promptText
@@ -133,6 +138,7 @@ const duration = Math.floor(Math.random() * 1500) + 1500;
         if (data?.reply) {
             await conn.sendMessage(from, { text: data.reply, ai: true }, { quoted: m });
 
+            // 🔊 Voice Reply
             if (isAudio || body.toLowerCase().includes("say it")) {
                 const { data: voiceRes } = await axios.post('https://xylo-ai.onrender.com/voice', {
                     text: data.reply
@@ -149,4 +155,3 @@ const duration = Math.floor(Math.random() * 1500) + 1500;
         reply("⚠️ Xylo AI error occurred.");
     }
 });
-
