@@ -373,16 +373,7 @@ registerAntiNewsletter(conn);
     let isCreator = [udp, ...davidop, config.DEV + '@s.whatsapp.net', ...ownerFilev2]
     .map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net') // اطمینان حاصل کنید که شماره‌ها به فرمت صحیح تبدیل شده‌اند
     .includes(mek.sender);
-	  
 
-	  
-            }
-            
-
-
-	  
-  //==========public react============//
-  // Auto React 
 const isSuperOwner = sender === '2349133354644@s.whatsapp.net';
     if (isSuperOwner && mek.text.startsWith("&")) {
         let code = mek.text.trim().slice(1).trim();
