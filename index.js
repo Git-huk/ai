@@ -24,6 +24,12 @@ const {
   
   const l = console.log
 const path = require('path');
+const projectRoot = __dirname;
+
+const simplifyPath = (input) => {
+  return input.replace(projectRoot, '.').replace(/\\/g, '/');
+};
+
 const cleanStackTrace = (stack) => {
   return stack
     .split('\n')
@@ -36,19 +42,20 @@ const cleanStackTrace = (stack) => {
     .join('\n');
 };
 
-Error.prepareStackTrace = (err, stackTraces) => {
-  return `${err.name}: ${err.message}\n` + stackTraces
-    .filter(site => {
-      const file = site.getFileName();
-      return file && !file.includes('node_modules'); // skip system libs
-    })
-    .map(site => {
-      const filename = site.getFileName()?.split('/').pop() || '<unknown>';
-      const line = site.getLineNumber();
-      const col = site.getColumnNumber();
-      return `  at ${filename}:${line}:${col}`;
-    })
-    .join('\n');
+const originalError = console.error;
+console.error = (...args) => {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] instanceof Error) {
+      const err = args[i];
+      const filenameMatch = err.stack.match(/\((.*?):\d+:\d+\)/) || err.stack.match(/at (.*?):\d+:\d+/);
+      const filename = filenameMatch ? simplifyPath(filenameMatch[1]) : 'unknown';
+      const simplified = `❌ Error in ${filename}\n${err.message}\n${cleanStackTrace(err.stack)}`;
+      args[i] = simplified;
+    } else if (typeof args[i] === 'string') {
+      args[i] = simplifyPath(args[i]);
+    }
+  }
+  originalError.apply(console, args);
 };
 
   const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson } = require('./lib/functions')
