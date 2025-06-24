@@ -311,23 +311,6 @@ registerAntiNewsletter(conn);
     
     }
   }
-
-if (config.AUTO_STATUS_SEEN === "true") {
-  // 🔄 Periodic Status View Checker
-  setInterval(async () => {
-    try {
-      const jid = 'status@broadcast';
-      const messages = await conn.fetchMessagesFromJid(jid, 10); // fetch recent statuses
-      for (const msg of messages) {
-        await conn.readMessages([msg.key]);
-      }
-      console.log('✅ Auto-viewed latest statuses');
-    } catch (e) {
-      console.error('❌ Error in status view interval:', e.message);
-    }
-  }, 5 * 60 * 1000); // every 5 minutes
-}
-
   if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REACT === "true"){
     const dlike = await conn.decodeJid(conn.user.id);
     const emojis = ['❤️', '🌹', '😇', '🤡', '🍆', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '👄', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🍑', '🌷', '⛅', '🌟', '✨', '🇳🇬', '💜', '💙', '🌝', '🖤', '💚'];
