@@ -219,6 +219,19 @@ conn.ev.on('connection.update', async (update) => {
     startupSent = true;
     console.log('✅ XBOT-MD Connected Successfully');
 
+	  // 🔄 Load all .js plugin files so they can self-register via cmd()
+const pluginPath = path.join(__dirname, 'plugins');
+fs.readdirSync(pluginPath).forEach((plugin) => {
+    if (path.extname(plugin).toLowerCase() === ".js") {
+        try {
+            require(path.join(pluginPath, plugin));
+            console.log(`✅ Loaded plugin: ${plugin}`);
+        } catch (err) {
+            console.error(`❌ Failed to load plugin ${plugin}:`, err.message);
+        }
+    }
+});
+
     try {
       const upMessage = `*🤖 X-BOT-MD is Online!*
 
@@ -309,6 +322,24 @@ registerAntiNewsletter(conn);
     
     }
   }
+
+
+if (config.AUTO_STATUS_SEEN === "true") {
+  // 🔄 Periodic Status View Checker
+  setInterval(async () => {
+    try {
+      const jid = 'status@broadcast';
+      const messages = await conn.fetchMessagesFromJid(jid, 10); // fetch recent statuses
+      for (const msg of messages) {
+        await conn.readMessages([msg.key]);
+      }
+      console.log('✅ Auto-viewed latest statuses');
+    } catch (e) {
+      console.error('❌ Error in status view interval:', e.message);
+    }
+  }, 5 * 60 * 1000); // every 5 minutes
+}
+	  
 
   if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REACT === "true"){
     const dlike = await conn.decodeJid(conn.user.id);
@@ -1072,22 +1103,3 @@ app.get("/", (req, res) => {
   setTimeout(() => {
   connectToWA()
   }, 4000);
-
- // every 5 minutes
-
-
-if (config.AUTO_STATUS_SEEN === "true") {
-  // 🔄 Periodic Status View Checker
-  setInterval(async () => {
-    try {
-      const jid = 'status@broadcast';
-      const messages = await conn.fetchMessagesFromJid(jid, 10); // fetch recent statuses
-      for (const msg of messages) {
-        await conn.readMessages([msg.key]);
-      }
-      console.log('✅ Auto-viewed latest statuses');
-    } catch (e) {
-      console.error('❌ Error in status view interval:', e.message);
-    }
-  }, 5 * 60 * 1000); // every 5 minutes
-}
