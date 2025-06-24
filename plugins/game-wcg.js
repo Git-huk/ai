@@ -8,8 +8,6 @@ const STATS_PATH = "./lib/wcg-stats.json";
 
 const timers = {};
 const startTimers = {};
-const cooldowns = {};
-
 const WAIT_TIME = 30;
 const MAX_PLAYERS = 20;
 
@@ -23,6 +21,7 @@ function load(path) {
   if (!fs.existsSync(path)) return {};
   return JSON.parse(fs.readFileSync(path, "utf-8") || "{}");
 }
+
 function save(path, data) {
   fs.writeFileSync(path, JSON.stringify(data, null, 2));
 }
@@ -37,9 +36,8 @@ async function isValidWord(word) {
 }
 
 function getWordLengthForTurn(game) {
-  const modeData = modes[game.mode] || modes.medium;
-  const increments = Math.floor(game.roundsCompleted / modeData.lengthIncrementEveryRounds);
-  return modeData.baseLength + increments;
+  const mode = modes[game.mode] || modes.medium;
+  return mode.baseLength + Math.floor(game.roundsCompleted / mode.lengthIncrementEveryRounds);
 }
 
 function updateStats(player, win, wordCount, roundCount) {
@@ -57,6 +55,7 @@ function clearStartTimer(chatId) {
     delete startTimers[chatId];
   }
 }
+
 function clearTurnTimer(chatId) {
   if (timers[chatId]) {
     clearTimeout(timers[chatId]);
@@ -68,187 +67,187 @@ function isPatternRepeated(word) {
   return /^([a-zA-Z])\1+$/.test(word);
 }
 
-function isBot(user) {
-  return user === config.BOT_NUMBER || user.endsWith("@g.us") === false;
+function formatPlayers(players) {
+  return players.map((p, i) => `👤 ${i + 1}. @${p.split("@")[0]}`).join("\n");
 }
 
-function formatScoreboard(players) {
-  return players.map((p, i) => `🥇 ${i + 1}. @${p.split("@")[0]}`).join("\n");
+function getMentionJid(jid) {
+  return [jid];
 }
 
-cmd({
-  pattern: "wcg",
-  desc: "Start word chain game",
-  category: "game",
-  filename: __filename
-}, async (m, text, { isGroup }) => {
-  const chatId = m.chat;
-  const sender = m.sender;
-  const args = text.split(" ");
-  const mode = (args[0] || "medium").toLowerCase();
+function getMentionTag(jid) {
+  return `@${jid.split("@")[0]}`;
+}
 
-  if (!m.isGroup && isBot(sender)) {
-    return m.reply("🔒 You can't control me in private chat, but you can still play if a game is active.");
-  }
+cmd(
+  {
+    pattern: "wcg",
+    desc: "Start word chain game",
+    category: "game",
+    filename: __filename,
+  },
+  async (m, text, { botNumber, conn }) => {
+    const chatId = m.chat;
+    const sender = m.sender;
+    const args = text.trim().split(" ");
+    const mode = (args[0] || "medium").toLowerCase();
 
-  if (!["easy", "medium", "hard"].includes(mode)) {
-    return m.reply("⚠️ Invalid mode. Choose: easy, medium, hard.");
-  }
+    if (!modes[mode]) return m.reply("⚠️ Invalid mode. Use `easy`, `medium`, or `hard`.");
 
-  const db = load(DB_PATH);
-  if (db[chatId]) return m.reply("⛔ A game is already running in this chat.");
+    const db = load(DB_PATH);
+    if (db[chatId]) return m.reply("⚠️ A game is already active in this chat!");
 
-  db[chatId] = {
-    players: [sender],
-    turn: 0,
-    round: 1,
-    roundsCompleted: 0,
-    usedWords: [],
-    lastWord: null,
-    mode,
-    started: false,
-  };
-  save(DB_PATH, db);
-
-  m.reply(`🧠 Word Chain Game started in *${mode}* mode!\n⏳ You have ${WAIT_TIME}s to join.\n\nSend *join* to participate!`);
-
-  startTimers[chatId] = setTimeout(() => {
-    startGame(chatId, m);
-  }, WAIT_TIME * 1000);
-});
-
-async function startGame(chatId, m) {
-  const db = load(DB_PATH);
-  const game = db[chatId];
-  if (!game || game.players.length < 2) {
-    delete db[chatId];
+    db[chatId] = {
+      players: [sender],
+      usedWords: [],
+      round: 0,
+      roundsCompleted: 0,
+      currentWord: null,
+      expectedStart: null,
+      mode,
+      turnIndex: 0,
+      gameStarted: false,
+    };
     save(DB_PATH, db);
-    return m.reply("❌ Not enough players to start the game.");
+
+    m.reply(`🧠 Word Chain Game Started in *${mode.toUpperCase()}* mode!\n\nPlayers can join for ${WAIT_TIME} seconds using *wcgjoin*.\n\nMax players: ${MAX_PLAYERS}`);
+
+    startTimers[chatId] = setTimeout(async () => {
+      const db = load(DB_PATH);
+      const game = db[chatId];
+      if (!game || game.players.length < 2) {
+        delete db[chatId];
+        save(DB_PATH, db);
+        return m.reply("⚠️ Not enough players joined. Game cancelled.");
+      }
+
+      game.gameStarted = true;
+
+      // Ensure bot joins but never starts first
+      if (!game.players.includes(botNumber)) {
+        game.players.push(botNumber);
+      }
+      const realPlayers = game.players.filter(p => p !== botNumber);
+      if (game.players[0] === botNumber && realPlayers.length > 0) {
+        const nonBot = realPlayers[Math.floor(Math.random() * realPlayers.length)];
+        const idx = game.players.indexOf(nonBot);
+        [game.players[0], game.players[idx]] = [game.players[idx], game.players[0]];
+      }
+
+      save(DB_PATH, db);
+      nextTurn(chatId, conn, botNumber);
+    }, WAIT_TIME * 1000);
+  }
+);
+
+cmd(
+  {
+    pattern: "wcgjoin",
+    desc: "Join WCG",
+    category: "game",
+    filename: __filename,
+  },
+  async (m) => {
+    const db = load(DB_PATH);
+    const game = db[m.chat];
+    if (!game || game.gameStarted) return;
+
+    if (game.players.includes(m.sender)) return m.reply("🫵 You're already in the game!");
+    if (game.players.length >= MAX_PLAYERS) return m.reply("⚠️ Maximum players reached!");
+
+    game.players.push(m.sender);
+    save(DB_PATH, db);
+    m.reply(`✅ Joined!\nCurrent players:\n${formatPlayers(game.players)}`);
+  }
+);
+
+async function nextTurn(chatId, conn, botNumber) {
+  const db = load(DB_PATH);
+  const game = db[chatId];
+  if (!game) return;
+
+  game.round++;
+  if (game.turnIndex >= game.players.length) {
+    game.turnIndex = 0;
+    game.roundsCompleted++;
   }
 
-  game.started = true;
-  game.turn = 1; // Start from second user, bot never starts
-  game.roundsCompleted = 0;
-  game.usedWords = [];
-  game.lastWord = null;
+  const player = game.players[game.turnIndex];
+  const requiredLength = getWordLengthForTurn(game);
+  const expected = game.currentWord ? game.currentWord.slice(-1) : null;
 
+  game.expectedStart = expected;
   save(DB_PATH, db);
-  m.reply(`🎮 Game started with ${game.players.length} players!\n${formatScoreboard(game.players)}`);
-  nextTurn(chatId, m);
-}
 
-async function nextTurn(chatId, m) {
-  const db = load(DB_PATH);
-  const game = db[chatId];
-  if (!game) return;
+  const msg = `🎮 Round ${game.round}\n👤 Turn: ${getMentionTag(player)}\n📏 Minimum letters: ${requiredLength}` +
+    (expected ? `\n🔤 Word must start with: *${expected.toUpperCase()}*` : "") +
+    `\n⏳ You have ${modes[game.mode].turnTime}s.`;
 
-  clearTurnTimer(chatId);
+  await conn.sendMessage(chatId, { text: msg, mentions: getMentionJid(player) });
 
-  const currentPlayer = game.players[game.turn % game.players.length];
-  const minLength = getWordLengthForTurn(game);
-  const prefix = game.lastWord ? game.lastWord.slice(-1) : null;
-
-  m.reply(`🕒 @${currentPlayer.split("@")[0]}'s turn!\n${prefix ? `Your word must start with *${prefix}*` : `Start with any word`}\n🔠 Minimum length: *${minLength}*`, {
-    mentions: [currentPlayer]
-  });
-
-  timers[chatId] = setTimeout(() => {
-    eliminatePlayer(chatId, currentPlayer, m, "⏱️ Time's up!");
-  }, (modes[game.mode] || modes.medium).turnTime * 1000);
-}
-
-async function eliminatePlayer(chatId, player, m, reason) {
-  const db = load(DB_PATH);
-  const game = db[chatId];
-  if (!game) return;
-
-  game.players = game.players.filter(p => p !== player);
-  m.reply(`❌ @${player.split("@")[0]} eliminated. ${reason}`, { mentions: [player] });
-
-  if (game.players.length === 1) {
-    const winner = game.players[0];
-    m.reply(`🎉 @${winner.split("@")[0]} wins the game!\n🏆 GG!`, { mentions: [winner] });
-    updateStats(winner, true, game.usedWords.length, game.roundsCompleted);
-    delete db[chatId];
+  if (player === botNumber) {
     clearTurnTimer(chatId);
-    save(DB_PATH, db);
+    setTimeout(async () => {
+      let word = expected ? expected + "ame" : "game";
+      if (game.usedWords.includes(word)) word += "r";
+      game.usedWords.push(word);
+      game.currentWord = word;
+      game.turnIndex++;
+      save(DB_PATH, db);
+      conn.sendMessage(chatId, { text: `🤖 Bot played: *${word}*` });
+      nextTurn(chatId, conn, botNumber);
+    }, 2000);
     return;
   }
 
-  game.turn = game.turn % game.players.length;
-  game.roundsCompleted++;
-  save(DB_PATH, db);
-  nextTurn(chatId, m);
+  clearTurnTimer(chatId);
+  timers[chatId] = setTimeout(() => {
+    conn.sendMessage(chatId, { text: `⌛ @${player.split("@")[0]} ran out of time and was eliminated.`, mentions: [player] });
+    game.players.splice(game.turnIndex, 1);
+    if (game.players.length === 1) {
+      conn.sendMessage(chatId, { text: `🏆 Game Over! Winner: ${getMentionTag(game.players[0])}`, mentions: [game.players[0]] });
+      updateStats(game.players[0], true, game.usedWords.length, game.roundsCompleted);
+      delete db[chatId];
+    } else {
+      if (game.turnIndex >= game.players.length) game.turnIndex = 0;
+      nextTurn(chatId, conn, botNumber);
+    }
+    save(DB_PATH, db);
+  }, modes[game.mode].turnTime * 1000);
 }
 
-cmd({
-  on: "text"
-}, async (m) => {
-  const chatId = m.chat;
-  const sender = m.sender;
-  const text = m.text?.trim().toLowerCase();
-  if (!text || text.length < 2) return;
+cmd(
+  {
+    on: "text",
+    fromMe: false,
+    filename: __filename,
+  },
+  async (m, text, { botNumber, conn }) => {
+    const chatId = m.chat;
+    const db = load(DB_PATH);
+    const game = db[chatId];
+    if (!game || !game.gameStarted) return;
 
-  const db = load(DB_PATH);
-  const game = db[chatId];
-  if (!game || !game.started) return;
+    const player = game.players[game.turnIndex];
+    if (m.sender !== player) return;
 
-  const currentPlayer = game.players[game.turn % game.players.length];
-  if (sender !== currentPlayer) return;
+    const word = text.trim().toLowerCase();
 
-  if (!/^[a-z]+$/i.test(text)) {
-    return m.reply("⚠️ Please send a valid English word with letters only.");
+    if (!/^[a-zA-Z]+$/.test(word)) return m.reply("⚠️ Please send a valid English word with letters only.");
+    if (game.usedWords.includes(word)) return m.reply("🚫 That word has already been used!");
+    if (isPatternRepeated(word)) return m.reply("🚨 Suspicious pattern detected. Try a real word.");
+    if (game.expectedStart && word[0] !== game.expectedStart) return m.reply(`❌ Your word must start with: *${game.expectedStart.toUpperCase()}*`);
+    if (word.length < getWordLengthForTurn(game)) return m.reply(`✂️ Word too short! Needs at least ${getWordLengthForTurn(game)} letters.`);
+
+    const valid = await isValidWord(word);
+    if (!valid) return m.reply("📚 Word not found in dictionary!");
+
+    game.usedWords.push(word);
+    game.currentWord = word;
+    game.turnIndex++;
+    save(DB_PATH, db);
+    clearTurnTimer(chatId);
+    m.reply(`✅ Cool! *${word}* accepted!`);
+    nextTurn(chatId, conn, botNumber);
   }
-
-  if (game.usedWords.includes(text)) {
-    return m.reply("⚠️ Word already used! Try something new.");
-  }
-
-  if (isPatternRepeated(text)) {
-    return m.reply("🚨 No cheating! Repeated patterns are not allowed.");
-  }
-
-  if (game.lastWord && text[0] !== game.lastWord.slice(-1)) {
-    return m.reply(`❌ Your word must start with *${game.lastWord.slice(-1)}*`);
-  }
-
-  const minLength = getWordLengthForTurn(game);
-  if (text.length < minLength) {
-    return m.reply(`✏️ Word too short! Minimum: ${minLength} letters.`);
-  }
-
-  const isReal = await isValidWord(text);
-  if (!isReal) return m.reply("❌ Not a real English word!");
-
-  clearTurnTimer(chatId);
-  game.usedWords.push(text);
-  game.lastWord = text;
-  game.turn = (game.turn + 1) % game.players.length;
-  game.roundsCompleted++;
-  save(DB_PATH, db);
-
-  m.reply("✅ Nice word! Next player...");
-  nextTurn(chatId, m);
-});
-
-cmd({
-  pattern: "join",
-  desc: "Join an active word chain game",
-  category: "game",
-  filename: __filename
-}, async (m) => {
-  const chatId = m.chat;
-  const sender = m.sender;
-  const db = load(DB_PATH);
-  const game = db[chatId];
-
-  if (!game || game.started) return;
-  if (game.players.includes(sender)) return m.reply("🔁 You already joined.");
-  if (game.players.length >= MAX_PLAYERS) return m.reply("😥 Game is full.");
-
-  game.players.push(sender);
-  save(DB_PATH, db);
-  m.reply(`✅ @${sender.split("@")[0]} joined the game! (${game.players.length}/${MAX_PLAYERS})`, {
-    mentions: [sender]
-  });
-});
+);
