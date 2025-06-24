@@ -72,6 +72,7 @@ const { setupLinkDetection } = require("./lib/events/antilinkDetection")
   const util = require('util')
   const { sms, downloadMediaMessage, AntiDelete } = require('./lib')
   const { registerAntiNewsletter } = require('./plugins/antinewsletter')
+const regisWcg = require('./plugins/game-wcg')
   const { updateActivity } = require('./lib/activity')
   const { registerGroupMessages } = require('./plugins/groupMessages')
   const FileType = require('file-type');
@@ -268,6 +269,8 @@ async function connectToWA() {
 setupLinkDetection(conn);
 
 registerAntiNewsletter(conn);
+
+regisWcg(conn);
 	
  /// READ STATUS       
   conn.ev.on('messages.upsert', async(mek) => {
