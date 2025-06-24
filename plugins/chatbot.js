@@ -5,7 +5,7 @@ const { setConfig, getConfig } = require("../lib/configdb");
 const fs = require('fs');
 const { downloadTempMedia, cleanupTemp } = require("../lib/media-utils");
 
-// ✅ Add simulateTyping function here
+// ✅ simulateTyping function
 const simulateTyping = async (conn, jid, ms = 2000) => {
   await conn.sendPresenceUpdate('composing', jid);
   await new Promise(resolve => setTimeout(resolve, ms));
@@ -13,145 +13,127 @@ const simulateTyping = async (conn, jid, ms = 2000) => {
 };
 
 let AI_STATE = {
-    IB: "false",
-    GC: "false"
+  IB: "false",
+  GC: "false"
 };
 
+// ✅ Admin toggle command
 cmd({
-    pattern: "chatbot",
-    alias: ["xylo"],
-    desc: "Enable or disable AI chatbot responses",
-    category: "ai",
-    filename: __filename,
-    react: "🤖"
+  pattern: "chatbot",
+  alias: ["xylo"],
+  desc: "Enable or disable AI chatbot responses",
+  category: "ai",
+  filename: __filename,
+  react: "🤖"
 }, async (conn, mek, m, { from, args, isOwner, reply }) => {
-    if (!isOwner) return reply("❌ Only the bot owner can use this command.");
+  if (!isOwner) return reply("❌ Only the bot owner can use this command.");
 
-    const mode = args[0]?.toLowerCase();
-    const target = args[1]?.toLowerCase();
+  const mode = args[0]?.toLowerCase();
+  const target = args[1]?.toLowerCase();
 
-    if (mode === "on") {
-        if (!target || target === "all") {
-            AI_STATE.IB = "true";
-            AI_STATE.GC = "true";
-        } else if (target === "pm") {
-            AI_STATE.IB = "true";
-        } else if (target === "gc") {
-            AI_STATE.GC = "true";
-        }
-        await setConfig("AI_STATE", JSON.stringify(AI_STATE));
-        return reply("✅ Xylo AI enabled for " + (target || "all") + " chats.");
-    } else if (mode === "off") {
-        if (!target || target === "all") {
-            AI_STATE.IB = "false";
-            AI_STATE.GC = "false";
-        } else if (target === "pm") {
-            AI_STATE.IB = "false";
-        } else if (target === "gc") {
-            AI_STATE.GC = "false";
-        }
-        await setConfig("AI_STATE", JSON.stringify(AI_STATE));
-        return reply("❌ Xylo AI disabled for " + (target || "all") + " chats.");
-    } else {
-        return reply(`🤖 *Xylo AI Control Panel*
+  if (mode === "on") {
+    if (!target || target === "all") {
+      AI_STATE.IB = "true";
+      AI_STATE.GC = "true";
+    } else if (target === "pm") {
+      AI_STATE.IB = "true";
+    } else if (target === "gc") {
+      AI_STATE.GC = "true";
+    }
+    await setConfig("AI_STATE", JSON.stringify(AI_STATE));
+    return reply("✅ Xylo AI enabled for " + (target || "all") + " chats.");
+  } else if (mode === "off") {
+    if (!target || target === "all") {
+      AI_STATE.IB = "false";
+      AI_STATE.GC = "false";
+    } else if (target === "pm") {
+      AI_STATE.IB = "false";
+    } else if (target === "gc") {
+      AI_STATE.GC = "false";
+    }
+    await setConfig("AI_STATE", JSON.stringify(AI_STATE));
+    return reply("❌ Xylo AI disabled for " + (target || "all") + " chats.");
+  } else {
+    return reply(`🤖 *Xylo AI Control Panel*
 
 📥 PM: ${AI_STATE.IB === "true" ? "✅ On" : "❌ Off"}
 👥 Group: ${AI_STATE.GC === "true" ? "✅ On" : "❌ Off"}
 
 Usage:
 ${config.PREFIX}chatbot on|off all|pm|gc`);
-    }
+  }
 });
 
+// ✅ Load AI_STATE from config
 (async () => {
-    const saved = await getConfig("AI_STATE");
-    if (saved) AI_STATE = JSON.parse(saved);
+  const saved = await getConfig("AI_STATE");
+  if (saved) AI_STATE = JSON.parse(saved);
 })();
 
+// ✅ Auto reply handler
 cmd({
-    on: "body"
+  on: "body"
 }, async (conn, m, store, {
-    from,
-    body,
-    isGroup,
-    sender,
-    reply
+  from,
+  body,
+  isGroup,
+  sender,
+  reply
 }) => {
-    try {
-        if (m.key.fromMe || body?.startsWith(config.PREFIX)) return;
+  try {
+    if (m.key.fromMe || body?.startsWith(config.PREFIX)) return;
 
-        const allowed = isGroup ? AI_STATE.GC === "true" : AI_STATE.IB === "true";
-        if (!allowed) return;
+    const allowed = isGroup ? AI_STATE.GC === "true" : AI_STATE.IB === "true";
+    if (!allowed) return;
 
-        const quoted = m?.message?.extendedTextMessage?.contextInfo?.participant;
-        const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
-        const mentionedBot = body?.toLowerCase().includes("say it") || quoted === botJid;
+    const quoted = m?.message?.extendedTextMessage?.contextInfo?.participant;
+    const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
+    const mentionedBot = body?.toLowerCase().includes("say it") || quoted === botJid;
 
-        if (!mentionedBot && !m?.message?.audioMessage) return;
+    if (!mentionedBot && !m?.message?.audioMessage) return;
 
-        const isAudio = !!m.message.audioMessage;
-        let promptText = body;
+    const isAudio = !!m.message.audioMessage;
+    const promptText = body;
 
-        if (isAudio) {
-            const audioBuffer = await conn.downloadAndSaveMediaMessage(m, "./tmp/voice.ogg");
-            const res = await axios.post('https://xylo-ai.onrender.com/transcribe', {
-                audioUrl: fs.existsSync(audioBuffer) ? `file://${audioBuffer}` : ""
-            });
-            promptText = res.data?.text || "Hello";
-            fs.unlinkSync(audioBuffer); // clean
-        }
-
-        // 🖼️ Image Generation
-        if (body.toLowerCase().startsWith("draw ")) {
-            const prompt = body.slice(5).trim();
-            const { data: draw } = await axios.post('https://xylo-ai.onrender.com/draw', {
-                prompt
-            });
-            const imgPath = await downloadTempMedia(draw.imageUrl, 'xylo_img.jpg');
-            await conn.sendMessage(from, { image: fs.readFileSync(imgPath), caption: "🖼️ Generated by 𝕏ʏʟᴏ" }, { quoted: m });
-            cleanupTemp(imgPath);
-            return;
-        }
-
-        // 🎬 Video Generation
-        if (body.toLowerCase().startsWith("video ")) {
-            const prompt = body.slice(6).trim();
-            const { data: vid } = await axios.post('https://xylo-ai.onrender.com/video', {
-                prompt
-            });
-            const vidPath = await downloadTempMedia(vid.videoUrl, 'xylo_clip.mp4');
-            await conn.sendMessage(from, { video: fs.readFileSync(vidPath), caption: "🎬 Xylo AI Video" }, { quoted: m });
-            cleanupTemp(vidPath);
-            return;
-        }
-
-        // ⌨️ Simulate Typing
-        const duration = Math.floor(Math.random() * 1500) + 1500;
-        await simulateTyping(conn, from, duration);
-
-        // 🤖 AI Chat Response
-        const { data } = await axios.post('https://xylo-ai.onrender.com/ask', {
-            userId: sender,
-            message: promptText
-        });
-
-        if (data?.reply) {
-            await conn.sendMessage(from, { text: data.reply, ai: true }, { quoted: m });
-
-            // 🔊 Voice Reply
-            if (isAudio || body.toLowerCase().includes("say it")) {
-                const { data: voiceRes } = await axios.post('https://xylo-ai.onrender.com/voice', {
-                    text: data.reply
-                });
-                const tempPath = await downloadTempMedia(voiceRes.audioUrl, "xylo_voice.mp3");
-                await conn.sendMessage(from, { audio: fs.readFileSync(tempPath), mimetype: 'audio/mp4', ptt: true }, { quoted: m });
-                cleanupTemp(tempPath);
-            }
-        } else {
-            reply("⚠️ No reply from Xylo.");
-        }
-    } catch (err) {
-        console.error("AI Chat Error:", err.message);
-        reply("⚠️ Xylo AI error occurred.");
+    // 🖼️ Image Generation
+    if (body.toLowerCase().startsWith("draw ")) {
+      const prompt = body.slice(5).trim();
+      const { data: draw } = await axios.post('https://xylo-ai.onrender.com/draw', {
+        prompt
+      });
+      const imgPath = await downloadTempMedia(draw.imageUrl, 'xylo_img.jpg');
+      await conn.sendMessage(from, { image: fs.readFileSync(imgPath), caption: "🖼️ Generated by 𝕏ʏʟᴏ" }, { quoted: m });
+      cleanupTemp(imgPath);
+      return;
     }
+
+    // ⌨️ Simulate Typing
+    const duration = Math.floor(Math.random() * 1500) + 1500;
+    await simulateTyping(conn, from, duration);
+
+    // 🤖 Ask AI
+    const { data } = await axios.post('https://xylo-ai.onrender.com/ask', {
+      userId: sender,
+      message: promptText
+    });
+
+    if (data?.reply) {
+      await conn.sendMessage(from, { text: data.reply, ai: true }, { quoted: m });
+
+      // 🔊 Voice Reply
+      if (isAudio || body.toLowerCase().includes("say it")) {
+        const { data: voiceRes } = await axios.post('https://xylo-ai.onrender.com/voice', {
+          text: data.reply
+        });
+        const tempPath = await downloadTempMedia(voiceRes.audioUrl, "xylo_voice.mp3");
+        await conn.sendMessage(from, { audio: fs.readFileSync(tempPath), mimetype: 'audio/mp4', ptt: true }, { quoted: m });
+        cleanupTemp(tempPath);
+      }
+    } else {
+      reply("⚠️ No reply from Xylo.");
+    }
+  } catch (err) {
+    console.error("AI Chat Error:", err.message);
+    reply("⚠️ Xylo AI error occurred.");
+  }
 });
