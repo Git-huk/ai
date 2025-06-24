@@ -1,13 +1,14 @@
 const fs = require("fs");
 const axios = require("axios");
 const { cmd } = require("../command");
+const config = require("../config");
 
 const DB_PATH = "./lib/wcg-database.json";
 
 const timers = {};
 const startTimers = {};
 
-const WAIT_TIME = 30; // seconds before game starts
+const WAIT_TIME = 30;
 
 const modes = {
   easy: { turnTime: 40, baseLength: 3, lengthIncrementEveryRounds: 4 },
@@ -53,14 +54,21 @@ function getWordLengthForTurn(game) {
   return modeData.baseLength + increments;
 }
 
-module.exports = function registerWcg(conn) {
-  // Start command
+function register() {
   cmd({
-    pattern: "wcg ?(.*)",
+    pattern: "wcg",
     desc: "Start a Word Chain Game with optional mode: easy, medium, hard",
     category: "game",
     filename: __filename,
-  }, async (conn, mek, m, { from, reply, sender, args }) => {
+  }, async (conn, mek, m, { from, reply, sender, body }) => {
+    // Parse args manually from body:
+    // Assume prefix + command like ".wcg easy" or ".wcg"
+    let args = [];
+    if (body) {
+      const parts = body.trim().split(/\s+/);
+      if (parts.length > 1) args = parts.slice(1);
+    }
+
     const db = loadDB();
 
     if (db[from] && !db[from].finished) return reply("⚠️ A Word Chain game is already running here.");
@@ -135,7 +143,7 @@ module.exports = function registerWcg(conn) {
     }, WAIT_TIME * 1000);
   });
 
-  // Listener for free text: join-wcg and word play
+  // Listener on free text to catch join-wcg and player words
   cmd({
     on: "body",
     dontAddCommandList: true,
@@ -149,7 +157,6 @@ module.exports = function registerWcg(conn) {
     if (!game || game.type !== "wcg" || game.finished) return;
 
     if (game.waiting) {
-      // Accept join-wcg only while waiting
       if (text === "join-wcg") {
         if (game.players.includes(sender)) return reply("⚠️ You already joined the game.");
         if (game.players.length >= 20) return reply("⚠️ Player limit reached (20).");
@@ -163,15 +170,12 @@ module.exports = function registerWcg(conn) {
           { mentions: game.players }
         );
       }
-      // Ignore any other messages during waiting phase
       return;
     }
 
-    // Game started, only current player's turn accepted
     const currentPlayer = game.players[game.turn];
     if (currentPlayer !== sender) return;
 
-    // Validate word input
     if (!/^[a-z]{2,}$/.test(text)) return reply("⚠️ Please send a valid English word with letters only.");
     if (text.length < getWordLengthForTurn(game)) return reply(`📏 Word too short! Minimum *${getWordLengthForTurn(game)}* letters required.`);
     if (game.words.includes(text)) return reply("♻️ Word already used! Try a different one.");
@@ -188,11 +192,9 @@ module.exports = function registerWcg(conn) {
       }
     }
 
-    // Word accepted
     game.words.push(text);
     game.turn = (game.turn + 1) % game.players.length;
 
-    // Increment roundsCompleted after full cycle
     if (game.turn === 0) game.roundsCompleted++;
 
     clearTurnTimer(from);
@@ -249,4 +251,6 @@ module.exports = function registerWcg(conn) {
       mentions: [game.players[game.turn]],
     });
   }
-};
+}
+
+register();
