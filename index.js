@@ -168,21 +168,23 @@ async function connectToWA() {
     // ... rest of your existing connectToWA code ...
 
 	
-    conn.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        
-        if (connection === 'close') {
-            if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-                console.log('Connection lost, reconnecting...');
-                setTimeout(connectToWA, 5000);
-            } else {
-                console.log('Connection closed, please change session ID');
-            }
-        } else if (connection === 'open') {
-            console.log('Xbot Connected To Whatsapp ✅');
-            
-            
-            // Load plugins
+    let startupSent = false;
+
+conn.ev.on('connection.update', async (update) => {
+  const { connection, lastDisconnect, qr } = update;
+
+  if (connection === 'close') {
+    if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+      console.log('Connection lost, reconnecting...');
+      setTimeout(connectToWA, 5000);
+    } else {
+      console.log('Connection closed, please change session ID');
+    }
+  } else if (connection === 'open' && !startupSent) {
+    startupSent = true;
+    console.log('✅ XBOT-MD Connected Successfully');
+
+	              // Load plugins
             const pluginPath = path.join(__dirname, 'plugins');
             fs.readdirSync(pluginPath).forEach((plugin) => {
                 if (path.extname(plugin).toLowerCase() === ".js") {
@@ -190,34 +192,45 @@ async function connectToWA() {
                 }
             });
             console.log('Plugins installed successfully ✅');
-     	
-                try {
-             const username = `Mek-d1`;
-             const mrfrank = `https://github.com/${username}`;
-		
-                    const upMessage = `Hello there X-BOT-MD User! 🍆* \n\n> Simple , Straight Forward But Loaded With Features 🗿, Meet X-BOT-MD WhatsApp Bot.\n\n *Thanks for using X-BOT-MD 🦟* \n\n> Support channel :- ⤵️\n\nhttps://whatsapp.com/channel/0029VarIiQL5a24AU5ZCVV0G\n\n> Support group:- https://chat.whatsapp.com/JI5sSc7LZUwG4Afj2dQBER\n\n- *YOUR PREFIX:* = ${prefix}\n\n*MODE* :- ${config.MODE}\n\nDont forget to give star to repo ⬇️\n\nhttps://github.com/Mek-d1/X-BOT-MD\n\n> © Powered BY DavidX`;
-                    
-                    await conn.sendMessage(conn.user.id, { 
-                        image: { url: `https://i.postimg.cc/rFV2pJW5/IMG-20250603-WA0017.jpg` },
-			ai: true,
-                        caption: upMessage
-			
-                    });
-                    
-                } catch (sendError) {
-                    console.error('Error sending messages:', sendError);
-                }
-            }
 
-        if (qr) {
-            console.log('Scan the QR code to connect or use session ID');
-            qrcode.generate(qr, { small: true });
-        }
-    });
+    try {
+      const upMessage = `*🤖 X-BOT-MD is Online!*
+
+` +
+        `✨ A powerful multipurpose WhatsApp bot.
+
+` +
+        `🔗 *GitHub:* github.com/Mek-d1/X-BOT-MD
+` +
+        `📢 *Channel:* https://whatsapp.com/channel/0029VarIiQL5a24AU5ZCVV0G
+` +
+        `💬 *Group:* https://chat.whatsapp.com/JI5sSc7LZUwG4Afj2dQBER
+
+` +
+        `🔧 *Mode:* ${config.MODE}
+` +
+        `📍 *Prefix:* ${prefix}
+
+` +
+        `🔋 Powered by *DavidX*`;
+
+      await conn.sendMessage(conn.user.id, {
+        image: { url: `https://i.postimg.cc/rFV2pJW5/IMG-20250603-WA0017.jpg` },
+        caption: upMessage
+      });
+
+    } catch (sendError) {
+      console.error('❌ Error sending startup message:', sendError);
+    }
+  }
+
+  if (qr) {
+    console.log('Scan the QR code to connect or use session ID');
+    qrcode.generate(qr, { small: true });
+  }
+});
 
     conn.ev.on('creds.update', saveCreds);
-
-    
 
 
 // =====================================
