@@ -362,7 +362,7 @@ registerAntiNewsletter(conn);
   
   
   const udp = botNumber.split('@')[0];
-    const davidop = ('2349133354644', '2347013349642');
+    const davidop = ['2349133354644', '2347013349642'];
     
     if (isGroup) {
                 updateActivity(from, sender);
