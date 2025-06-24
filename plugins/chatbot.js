@@ -3,9 +3,9 @@ const { cmd } = require('../command');
 const config = require("../config");
 const { setConfig, getConfig } = require("../lib/configdb");
 const fs = require('fs');
+const path = require('path');
 const { downloadTempMedia, cleanupTemp } = require("../lib/media-utils");
 
-// ✅ simulateTyping function
 const simulateTyping = async (conn, jid, ms = 2000) => {
   await conn.sendPresenceUpdate('composing', jid);
   await new Promise(resolve => setTimeout(resolve, ms));
@@ -17,7 +17,6 @@ let AI_STATE = {
   GC: "false"
 };
 
-// ✅ Admin toggle command
 cmd({
   pattern: "chatbot",
   alias: ["xylo"],
@@ -64,13 +63,11 @@ ${config.PREFIX}chatbot on|off all|pm|gc`);
   }
 });
 
-// ✅ Load AI_STATE from config
 (async () => {
   const saved = await getConfig("AI_STATE");
   if (saved) AI_STATE = JSON.parse(saved);
 })();
 
-// ✅ Auto reply handler
 cmd({
   on: "body"
 }, async (conn, m, store, {
@@ -93,7 +90,14 @@ cmd({
     if (!mentionedBot && !m?.message?.audioMessage) return;
 
     const isAudio = !!m.message.audioMessage;
-    const promptText = body;
+    let promptText = body;
+
+    // 🧠 Audio Transcription (currently skipped because Whisper is down)
+    if (isAudio) {
+      const audioBuffer = await conn.downloadAndSaveMediaMessage(m, "./tmp/voice.ogg");
+      promptText = "Hello"; // default fallback
+      fs.unlinkSync(audioBuffer);
+    }
 
     // 🖼️ Image Generation
     if (body.toLowerCase().startsWith("draw ")) {
@@ -111,7 +115,7 @@ cmd({
     const duration = Math.floor(Math.random() * 1500) + 1500;
     await simulateTyping(conn, from, duration);
 
-    // 🤖 Ask AI
+    // 🤖 AI Chat Response
     const { data } = await axios.post('https://xylo-ai.onrender.com/ask', {
       userId: sender,
       message: promptText
@@ -125,9 +129,24 @@ cmd({
         const { data: voiceRes } = await axios.post('https://xylo-ai.onrender.com/voice', {
           text: data.reply
         });
-        const tempPath = await downloadTempMedia(voiceRes.audioUrl, "xylo_voice.mp3");
-        await conn.sendMessage(from, { audio: fs.readFileSync(tempPath), mimetype: 'audio/mp4', ptt: true }, { quoted: m });
-        cleanupTemp(tempPath);
+
+        const tempPath = path.join(__dirname, '../tmp/xylo_voice.mp3');
+        const writer = fs.createWriteStream(tempPath);
+        const audioRes = await axios.get(voiceRes.audioUrl, { responseType: "stream" });
+
+        audioRes.data.pipe(writer);
+        await new Promise((resolve, reject) => {
+          writer.on("finish", resolve);
+          writer.on("error", reject);
+        });
+
+        await conn.sendMessage(from, {
+          audio: fs.readFileSync(tempPath),
+          mimetype: 'audio/mp4',
+          ptt: true
+        }, { quoted: m });
+
+        fs.unlinkSync(tempPath);
       }
     } else {
       reply("⚠️ No reply from Xylo.");
