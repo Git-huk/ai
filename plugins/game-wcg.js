@@ -6,6 +6,14 @@ const dbPath = "./lib/wcg-database.json";
 const timers = {};
 const startTimers = {};
 
+const WAIT_TIME = 30; // seconds wait before game starts
+
+const modes = {
+  easy: { turnTime: 40, baseLength: 3, lengthIncrementEveryRounds: 4 },
+  medium: { turnTime: 30, baseLength: 3, lengthIncrementEveryRounds: 2 },
+  hard: { turnTime: 25, baseLength: 4, lengthIncrementEveryRounds: 1 },
+};
+
 function loadDB() {
   if (!fs.existsSync(dbPath)) return {};
   return JSON.parse(fs.readFileSync(dbPath, "utf-8") || "{}");
@@ -38,17 +46,25 @@ function clearTurnTimer(chatId) {
   }
 }
 
+function getWordLengthForTurn(game) {
+  const modeData = modes[game.mode] || modes.medium;
+  const increments = Math.floor(game.roundsCompleted / modeData.lengthIncrementEveryRounds);
+  return modeData.baseLength + increments;
+}
+
 cmd({
-  pattern: "wcg",
-  desc: "Start a Word Chain Game",
+  pattern: "wcg ?(.*)",
+  desc: "Start a Word Chain Game with optional mode: easy, medium, hard",
   category: "game",
-  filename: __filename
-}, async (conn, mek, m, { from, reply, sender }) => {
+  filename: __filename,
+}, async (conn, mek, m, { from, reply, sender, args }) => {
   const db = loadDB();
 
-  if (db[from] && !db[from].finished) {
-    return reply("⚠️ A Word Chain game is already active. Send *join-wcg* to join!");
-  }
+  if (db[from] && !db[from].finished) return reply("⚠️ A Word Chain game is already running here.");
+
+  const modeArg = (args[0] || "medium").toLowerCase();
+  const mode = modes[modeArg] ? modeArg : "medium";
+  const modeData = modes[mode];
 
   db[from] = {
     type: "wcg",
@@ -57,18 +73,34 @@ cmd({
     turn: 0,
     waiting: true,
     finished: false,
-    wordLimit: 3,
+    mode: mode,
+    turnTime: modeData.turnTime,
+    roundsCompleted: 0,
+    requiredFirstLetter: null,
   };
 
   saveDB(db);
 
   reply(
-    `🎮 *Word Chain Game Started!*\n👤 Player 1: @${sender.split("@")[0]}\n⏳ Waiting for more players (max 20)...\nSend *join-wcg* to join.\n\n⏰ The game will start automatically in 40 seconds.`,
+    `🎮 *Word Chain Game Created!*\n👤 Player 1: @${sender.split("@")[0]}\n🛡 Mode: *${mode.toUpperCase()}*\n🕒 Waiting for players (max 20)...\n\nType *join-wcg* to jump in!\n\n⌛ Game starts in *${WAIT_TIME} seconds* — Get ready!`,
     null,
     { mentions: [sender] }
   );
 
   clearStartTimer(from);
+
+  // Countdown announcements at intervals
+  [20, 10, 5, 3, 1].forEach((sec) => {
+    setTimeout(() => {
+      const game = loadDB()[from];
+      if (!game || !game.waiting) return;
+      conn.sendMessage(from, {
+        text: `⏳ Game begins in *${sec} second${sec > 1 ? "s" : ""}*!\nType *join-wcg* to join the fun!`,
+      });
+    }, (WAIT_TIME - sec) * 1000);
+  });
+
+  // Start game after wait time
   startTimers[from] = setTimeout(() => {
     const db = loadDB();
     if (!db[from] || db[from].finished) return;
@@ -82,122 +114,65 @@ cmd({
       }
       game.waiting = false;
       game.turn = 0;
+
       const randomLetter = String.fromCharCode(97 + Math.floor(Math.random() * 26));
       game.requiredFirstLetter = randomLetter;
 
       saveDB(db);
 
       conn.sendMessage(from, {
-        text: `⏳ Time's up! Game starting with ${game.players.length} player(s).\n🧠 *Word Chain Begins!*\n🎯 @${game.players[0].split("@")[0]} starts.\n🔤 First letter: *${randomLetter.toUpperCase()}*\n📌 Send an English word starting with *${randomLetter.toUpperCase()}* and at least *3 letters*. Good luck!`,
-        mentions: game.players
+        text: `🔥 *Let the Word Chain Begin!*\n🎯 @${game.players[0].split("@")[0]} starts.\n🔤 First letter: *${randomLetter.toUpperCase()}*\n📏 Minimum length: *${getWordLengthForTurn(game)}*\n⏳ You have *${game.turnTime} seconds* to reply.\n\nType your word without any prefix!`,
+        mentions: game.players,
       });
 
       clearStartTimer(from);
-
       clearTurnTimer(from);
-      timers[from] = setTimeout(() => handleTimeout(conn, from), 40 * 1000);
+      timers[from] = setTimeout(() => handleTimeout(conn, from), game.turnTime * 1000);
     }
-  }, 40 * 1000);
+  }, WAIT_TIME * 1000);
 });
 
-cmd({
-  pattern: "join-wcg",
-  desc: "Join a Word Chain Game",
-  category: "game",
-  filename: __filename
-}, async (conn, mek, m, { from, sender, reply }) => {
-  const db = loadDB();
-  const game = db[from];
-
-  if (!game || game.type !== "wcg") return reply("❌ No active Word Chain game to join.");
-  if (!game.waiting) return reply("⚠️ Game already started, cannot join now.");
-  if (game.players.includes(sender)) return reply("⚠️ You already joined the game.");
-  if (game.players.length >= 20) return reply("⚠️ Player limit reached (20).");
-
-  game.players.push(sender);
-  saveDB(db);
-
-  reply(
-    `🙌 @${sender.split("@")[0]} joined the game! (${game.players.length} player(s) now)\n⏳ The game will start automatically 40 seconds after the first player started the game.`,
-    null,
-    { mentions: game.players }
-  );
-});
-
-cmd({
-  pattern: "leave-wcg",
-  desc: "Leave the Word Chain Game",
-  category: "game",
-  filename: __filename
-}, async (conn, mek, m, { from, sender, reply }) => {
-  const db = loadDB();
-  const game = db[from];
-  if (!game || game.type !== "wcg") return reply("❌ No active Word Chain game to leave.");
-  if (!game.players.includes(sender)) return reply("⚠️ You are not part of the current game.");
-
-  // Remove player
-  game.players = game.players.filter(p => p !== sender);
-
-  // If no players left, cancel game
-  if (game.players.length === 0) {
-    delete db[from];
-    saveDB(db);
-    return reply("✅ You left the game. No players remain, game cancelled.");
-  }
-
-  // If it’s the current player’s turn, advance turn
-  if (game.turn >= game.players.length) game.turn = 0;
-
-  saveDB(db);
-  reply(`✅ @${sender.split("@")[0]} left the game. ${game.players.length} player(s) remain.`, null, { mentions: game.players });
-
-  // If game was waiting and now only one player left, cancel game
-  if (game.waiting && game.players.length === 1) {
-    delete db[from];
-    saveDB(db);
-    return conn.sendMessage(from, { text: "⚠️ Only one player remains. Game cancelled." });
-  }
-});
-
-cmd({
-  pattern: "status-wcg",
-  desc: "Check Word Chain Game status",
-  category: "game",
-  filename: __filename
-}, async (conn, mek, m, { from, reply }) => {
-  const db = loadDB();
-  const game = db[from];
-  if (!game || game.type !== "wcg") return reply("❌ No active Word Chain game.");
-
-  let status = `🎮 *Word Chain Game Status*\n`;
-  status += `Players (${game.players.length}):\n`;
-  for (let i = 0; i < game.players.length; i++) {
-    status += `- ${i === game.turn ? "👉 " : ""}@${game.players[i].split("@")[0]}\n`;
-  }
-  status += `Words used (${game.words.length}): ${game.words.join(", ") || "None"}\n`;
-  status += game.waiting ? "⏳ Waiting for players to join...\n" : `🕹️ Game in progress. Next turn: @${game.players[game.turn].split("@")[0]}\n`;
-  status += `Minimum word length: ${game.wordLimit}\n`;
-  reply(status, null, { mentions: game.players });
-});
-
+// No join command — players join by typing "join-wcg" during waiting phase only
 cmd({
   pattern: ".*",
   dontAddCommandList: true,
   fromMe: false,
-  filename: __filename
+  filename: __filename,
 }, async (conn, mek, m, { from, sender, body, reply }) => {
   const text = (body || "").trim().toLowerCase();
   const db = loadDB();
   const game = db[from];
-  if (!game || game.type !== "wcg" || game.finished || game.waiting) return;
 
+  if (!game || game.type !== "wcg" || game.finished) return;
+
+  if (game.waiting) {
+    // Accept "join-wcg" only while waiting
+    if (text === "join-wcg") {
+      if (game.players.includes(sender)) return reply("⚠️ You already joined the game.");
+      if (game.players.length >= 20) return reply("⚠️ Player limit reached (20).");
+
+      game.players.push(sender);
+      saveDB(db);
+
+      return reply(
+        `🙌 Welcome @${sender.split("@")[0]}! You joined the Word Chain.\n👥 Players: ${game.players.length}\n⌛ Game starts soon — Get ready!`,
+        null,
+        { mentions: game.players }
+      );
+    }
+    // Ignore any other messages during waiting phase
+    return;
+  }
+
+  // If game started, only current player's turn words accepted
   const currentPlayer = game.players[game.turn];
-  if (currentPlayer !== sender) return; // Not your turn
+  if (currentPlayer !== sender) return;
 
-  if (!/^[a-z]{2,}$/.test(text)) return reply("⚠️ Only alphabetic English words are allowed.");
-  if (text.length < game.wordLimit) return reply(`📏 Word must be at least *${game.wordLimit}* letters.`);
-  if (game.words.includes(text)) return reply("♻️ Word already used!");
-  if (!(await isValidWord(text))) return reply("❌ Not a valid English word!");
+  // Validate word input
+  if (!/^[a-z]{2,}$/.test(text)) return reply("⚠️ Please send a valid English word with letters only.");
+  if (text.length < getWordLengthForTurn(game)) return reply(`📏 Word too short! Minimum *${getWordLengthForTurn(game)}* letters required.`);
+  if (game.words.includes(text)) return reply("♻️ Word already used! Try a different one.");
+  if (!(await isValidWord(text))) return reply("❌ That word doesn't seem valid. Try again!");
 
   if (game.words.length > 0) {
     const lastWord = game.words[game.words.length - 1];
@@ -210,18 +185,20 @@ cmd({
     }
   }
 
+  // Word accepted
   game.words.push(text);
   game.turn = (game.turn + 1) % game.players.length;
-  game.wordLimit = Math.min(game.wordLimit + 1, 7);
-  game.lastMoveTime = Date.now();
+
+  // Increment roundsCompleted after full cycle
+  if (game.turn === 0) game.roundsCompleted++;
 
   clearTurnTimer(from);
-  timers[from] = setTimeout(() => handleTimeout(conn, from), 40 * 1000);
+  timers[from] = setTimeout(() => handleTimeout(conn, from), game.turnTime * 1000);
 
   saveDB(db);
 
   reply(
-    `✅ *${text}* accepted!\n🧮 Words used: *${game.words.length}*\n🔠 Next word must start with *${text[text.length - 1].toUpperCase()}*\n➡️ @${game.players[game.turn].split("@")[0]}, your turn!\n📏 Min word length: *${game.wordLimit}*\n⏳ You have 40 seconds.`,
+    `✅ *${text}* accepted! 🎉\n🔠 Next word starts with *${text[text.length - 1].toUpperCase()}*\n➡️ @${game.players[game.turn].split("@")[0]}, your turn!\n📏 Min length: *${getWordLengthForTurn(game)}*\n⏳ You have ${game.turnTime} seconds.`,
     null,
     { mentions: game.players }
   );
@@ -233,19 +210,19 @@ async function handleTimeout(conn, from) {
   const game = db[from];
   if (game.finished) return;
 
-  const loser = game.players[game.turn];
+  const eliminated = game.players[game.turn];
   game.players.splice(game.turn, 1);
 
   await conn.sendMessage(from, {
-    text: `⌛ *Timeout!*\n@${loser.split("@")[0]} did not respond and was eliminated.`,
-    mentions: [loser]
+    text: `⌛ *Timeout!* @${eliminated.split("@")[0]} failed to respond in time and was eliminated.`,
+    mentions: [eliminated],
   });
 
   if (game.players.length === 1) {
     game.finished = true;
     await conn.sendMessage(from, {
-      text: `🏆 *Game Over!*\n🎉 Winner: @${game.players[0].split("@")[0]}`,
-      mentions: game.players
+      text: `🏆 *Game Over!* 🎉\nCongratulations to the winner: @${game.players[0].split("@")[0]} 🏅`,
+      mentions: game.players,
     });
     clearTurnTimer(from);
     clearStartTimer(from);
@@ -260,12 +237,12 @@ async function handleTimeout(conn, from) {
   const nextLetter = lastWord[lastWord.length - 1];
 
   clearTurnTimer(from);
-  timers[from] = setTimeout(() => handleTimeout(conn, from), 40 * 1000);
+  timers[from] = setTimeout(() => handleTimeout(conn, from), game.turnTime * 1000);
 
   saveDB(db);
 
   await conn.sendMessage(from, {
-    text: `➡️ It's @${game.players[game.turn].split("@")[0]}'s turn\n🔠 Word must start with *${nextLetter.toUpperCase()}*\n📏 Minimum length: *${game.wordLimit}*\n⏳ You have 40 seconds.`,
-    mentions: [game.players[game.turn]]
+    text: `➡️ It's @${game.players[game.turn].split("@")[0]}'s turn!\n🔠 Word must start with *${nextLetter.toUpperCase()}*\n📏 Min length: *${getWordLengthForTurn(game)}*\n⏳ You have ${game.turnTime} seconds.`,
+    mentions: [game.players[game.turn]],
   });
 }
