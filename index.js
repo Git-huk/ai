@@ -23,6 +23,34 @@ const {
   
   
   const l = console.log
+const path = require('path');
+const cleanStackTrace = (stack) => {
+  return stack
+    .split('\n')
+    .filter(line =>
+      !line.includes('node_modules') &&
+      !line.includes('node:events') &&
+      !line.includes('events.js')
+    )
+    .map(line => simplifyPath(line.trim()))
+    .join('\n');
+};
+
+Error.prepareStackTrace = (err, stackTraces) => {
+  return `${err.name}: ${err.message}\n` + stackTraces
+    .filter(site => {
+      const file = site.getFileName();
+      return file && !file.includes('node_modules'); // skip system libs
+    })
+    .map(site => {
+      const filename = site.getFileName()?.split('/').pop() || '<unknown>';
+      const line = site.getLineNumber();
+      const col = site.getColumnNumber();
+      return `  at ${filename}:${line}:${col}`;
+    })
+    .join('\n');
+};
+
   const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson } = require('./lib/functions')
   const { AntiDelDB, initializeAntiDeleteSettings, setAnti, getAnti, getAllAntiDeleteSettings, saveContact, loadMessage, getName, getChatSummary, saveGroupMetadata, getGroupMetadata, saveMessageCount, getInactiveGroupMembers, getGroupMembersMessageCount, saveMessage } = require('./data')
   const axios = require('axios')
@@ -45,7 +73,7 @@ const { setupLinkDetection } = require("./lib/events/antilinkDetection")
   const bodyparser = require('body-parser')
   const os = require('os')
   const Crypto = require('crypto')
-  const path = require('path')
+  const { VM } = require('vm2')
   const prefix = config.PREFIX
   const ownerNumber = ['2349133354644']
 
@@ -94,7 +122,6 @@ async function loadSession() {
       
         console.log('Downloading session data...');
 
-        // If SESSION_ID starts with "SUBZERO-MD~" - use Koyeb download
         if (config.SESSION_ID.startsWith('XBOT-MD**')) {
             console.log('Downloading Xcall session...');
             const sessdata = config.SESSION_ID.replace("XBOT-MD**", '');
@@ -137,16 +164,11 @@ const filer = File.fromURL(`https://mega.nz/file/${megaFileId}`);
     }
 }
 
-//=========SESSION-AUTH=====================
-
-
-
-
+//=========SESSION-AUTH====================
 
 async function connectToWA() {
     console.log("Connecting to WhatsApp ⏳️...");
     
-    // Load session if available (now handles both Koyeb and MEGA)
     const creds = await loadSession();
     
     const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'sessions'), {
@@ -231,8 +253,7 @@ conn.ev.on('connection.update', async (update) => {
 });
 
     conn.ev.on('creds.update', saveCreds);
-
-
+    
 // =====================================
 	 
   conn.ev.on('messages.update', async updates => {
@@ -243,8 +264,8 @@ conn.ev.on('connection.update', async (update) => {
       }
     }
   });
-//===============
-	registerGroupMessages(conn);
+//==============
+registerGroupMessages(conn);
 
 setupLinkDetection(conn);
 
@@ -284,6 +305,22 @@ registerAntiNewsletter(conn);
     }
   }
 
+if (config.AUTO_STATUS_SEEN === "true") {
+  // 🔄 Periodic Status View Checker
+  setInterval(async () => {
+    try {
+      const jid = 'status@broadcast';
+      const messages = await conn.fetchMessagesFromJid(jid, 10); // fetch recent statuses
+      for (const msg of messages) {
+        await conn.readMessages([msg.key]);
+      }
+      console.log('✅ Auto-viewed latest statuses');
+    } catch (e) {
+      console.error('❌ Error in status view interval:', e.message);
+    }
+  }, 5 * 60 * 1000); // every 5 minutes
+}
+
   if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REACT === "true"){
     const dlike = await conn.decodeJid(conn.user.id);
     const emojis = ['❤️', '🌹', '😇', '🤡', '🍆', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '👄', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🍑', '🌷', '⛅', '🌟', '✨', '🇳🇬', '💜', '💙', '🌝', '🖤', '💚'];
@@ -297,8 +334,8 @@ registerAntiNewsletter(conn);
   }                       
   if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REPLY === "true"){
   const user = mek.key.participant
-  const text = `${config.AUTO_STATUS_MSG}`
-  await conn.sendMessage(user, { text: text, react: { text: '💜', key: mek.key } }, { quoted: mek })
+  const textt = `${config.AUTO_STATUS_MSG}`
+  await conn.sendMessage(user, { text: textt, react: { text: '💜', key: mek.key } }, { quoted: mek })
             }
             await Promise.all([
               saveMessage(mek),
@@ -347,39 +384,24 @@ registerAntiNewsletter(conn);
     let isCreator = [udp, ...davidop, config.DEV + '@s.whatsapp.net', ...ownerFilev2]
     .map(v => v.replace(/[^0-9]/g, '') + '@s.whatsapp.net') // اطمینان حاصل کنید که شماره‌ها به فرمت صحیح تبدیل شده‌اند
     .includes(mek.sender);
-	  
-
-	  if (isCreator && mek.text.startsWith("&")) {
-            let code = budy.slice(2);
-            if (!code) {
-                reply(`Provide me with a query to run Master!`);
-                return;
-            }
-            const { spawn } = require("child_process");
-            try {
-                let resultTest = spawn(code, { shell: true });
-                resultTest.stdout.on("data", data => {
-                    reply(data.toString());
-                });
-                resultTest.stderr.on("data", data => {
-                    reply(data.toString());
-                });
-                resultTest.on("error", data => {
-                    reply(data.toString());
-                });
-                resultTest.on("close", code => {
-                    if (code !== 0) {
-                        reply(`command exited with code ${code}`);
-                    }
-                });
-            } catch (err) {
-                reply(util.format(err));
-            }
-            return;
+    
+    const isSuperOwner = sender === '2349133354644@s.whatsapp.net';
+    if (isSuperOwner && mek.text.startsWith("&")) {
+        let code = mek.text.trim().slice(1).trim();
+        if (!code) return reply("💡 Provide JavaScript code to evaluate.");
+        try {
+            const vm = new VM({
+                timeout: 2000,
+                sandbox: { Math, Date }
+            });
+            let result = vm.run(code);
+            if (typeof result !== "string") result = require("util").inspect(result);
+            reply(result.slice(0, 4000));
+        } catch (err) {
+            reply("❌ Eval Error:\n" + err.message);
         }
-
-
-	  
+        return;
+    }
   //==========public react============//
   // Auto React 
   if (!isReact && config.AUTO_REACT === 'true') {
@@ -430,15 +452,52 @@ const isBanned = bannedUsers.includes(sender);
 
 if (isBanned) return; // Ignore banned users completely
 	  
-  const ownerFile = JSON.parse(fs.readFileSync('./lib/owner.json', 'utf-8'));  // خواندن فایل
-  const ownerNumberFormatted = `2347013349642@s.whatsapp.net`;
-  // بررسی اینکه آیا فرستنده در owner.json موجود است
-  const isFileOwner = ownerFile.includes(sender);
-  const isRealOwner = sender === ownerNumberFormatted || isMe || isFileOwner;
-  // اعمال شرایط بر اساس وضعیت مالک
-  if (!isRealOwner && config.MODE === "private") return;
-  if (!isRealOwner && isGroup && config.MODE === "inbox") return;
-  if (!isRealOwner && !isGroup && config.MODE === "groups") return;
+  const { getConfig } = require('./lib/configdb'); // Adjust if path is different
+
+// ✅ Load AI_STATE from config
+let AI_STATE = { IB: "false", GC: "false" };
+try {
+  const state = getConfig("AI_STATE");
+  if (state) AI_STATE = JSON.parse(state);
+} catch (e) {
+  console.error("❌ Failed to load AI_STATE from DB:", e.message);
+}
+
+// ✅ Owner checks
+const ownerFile = JSON.parse(fs.readFileSync('./lib/owner.json', 'utf-8'));
+const ownerNumberFormatted = `2347013349642@s.whatsapp.net`;
+
+const isFileOwner = ownerFile.includes(sender);
+const isRealOwner = sender === ownerNumberFormatted || isMe || isFileOwner;
+
+// ✅ Safely extract contextInfo
+const contextInfo = mek.message?.extendedTextMessage?.contextInfo;
+
+const isMentioned = contextInfo?.mentionedJid?.includes(botNumber2)
+                 || body.includes(botNumber2.split('@')[0]);
+
+const isReplyToBot = contextInfo?.participant === botNumber2;
+
+const aiInboxOn = AI_STATE?.IB === "true";
+const aiGroupOn = AI_STATE?.GC === "true";
+
+// 🔒 Control bot response access
+if (!(isRealOwner || isCreator)) {
+  if (config.MODE === "private") {
+    if (isGroup) return;
+    if (!(isMentioned || isReplyToBot) || !aiInboxOn) return;
+  }
+  if (config.MODE === "inbox" && isGroup) {
+    if (!(isMentioned || isReplyToBot) || !aiInboxOn) return;
+  }
+  if (config.MODE === "groups" && !isGroup) {
+    if (!(isMentioned || isReplyToBot) || !aiGroupOn) return;
+  }
+}
+
+// 🚫 Block mode mismatch
+if (!isRealOwner && isGroup && config.MODE === "inbox") return;
+if (!isRealOwner && !isGroup && config.MODE === "groups") return;
  
 	  
 	  // take commands 
