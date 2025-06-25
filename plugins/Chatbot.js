@@ -14,17 +14,14 @@ const simulateTyping = async (conn, jid, ms = 1500) => {
 
 let AI_STATE = { IB: "false", GC: "false" };
 
-// Load AI config
 (async () => {
   const saved = await getConfig("AI_STATE");
   if (saved) AI_STATE = JSON.parse(saved);
 })();
 
-// AI Control Menu
 cmd({
   pattern: "chatbot",
   alias: ["xylo"],
-  react: "🤖",
   desc: "Control Xylo AI Chatbot mode",
   category: "ai",
   filename: __filename
@@ -94,7 +91,6 @@ Reply with:
     return;
   }
 
-  // Argument fallback
   const modeArg = args[0].toLowerCase();
   if (["pm", "gc", "all", "off"].includes(modeArg)) {
     AI_STATE.IB = ["pm", "all"].includes(modeArg) ? "true" : "false";
@@ -106,7 +102,6 @@ Reply with:
   }
 });
 
-// AI Chat Response Handler
 cmd({
   on: "body"
 }, async (conn, m, store, { from, body, isGroup, sender, reply }) => {
@@ -118,23 +113,18 @@ cmd({
 
     const botJid = conn.user.id.split(":")[0] + "@s.whatsapp.net";
     const contextInfo = m.message?.extendedTextMessage?.contextInfo || {};
-    const mentionedJids = contextInfo?.mentionedJid || [];
+    const mentionedJids = contextInfo.mentionedJid || [];
     const isMentioned = mentionedJids.includes(botJid);
-    const isReplyToBot = contextInfo?.participant === botJid;
+    const isReplyToBot = contextInfo.participant === botJid;
     const isAudio = !!m.message.audioMessage;
 
     const shouldRespond =
-      !isGroup ||
-      isMentioned ||
-      isReplyToBot ||
-      body.toLowerCase().includes("say it") ||
-      body.toLowerCase().startsWith("draw ");
+      !isGroup || isMentioned || isReplyToBot || body.toLowerCase().includes("say it") || body.toLowerCase().startsWith("draw ");
 
     if (!shouldRespond) return;
 
     let promptText = body;
 
-    // Image generation
     if (body.toLowerCase().startsWith("draw ")) {
       const prompt = body.slice(5).trim();
       const { data: draw } = await axios.post('https://xylo-ai.onrender.com/draw', { prompt });
@@ -156,11 +146,11 @@ cmd({
     await simulateTyping(conn, from, Math.floor(Math.random() * 1500) + 1000);
 
     const { data } = await axios.post("https://xylo-ai.onrender.com/ask", {
-      userId: sender.split("@")[0],
+      userId: sender,
       message: promptText
     });
 
-    if (!data?.reply) return reply("No reply from Xylo.");
+    if (!data?.reply) return;
 
     await conn.sendMessage(from, { text: data.reply }, { quoted: m });
 
@@ -189,6 +179,5 @@ cmd({
     }
   } catch (err) {
     console.error("Xylo AI error:", err);
-    reply("Xylo AI error occurred.");
   }
 });
