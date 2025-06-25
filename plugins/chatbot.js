@@ -3,9 +3,9 @@ const { cmd } = require('../command');
 const config = require("../config");
 const { setConfig, getConfig } = require("../lib/configdb");
 const fs = require('fs');
+const path = require('path');
 const { downloadTempMedia, cleanupTemp } = require("../lib/media-utils");
 
-// Typing simulator
 const simulateTyping = async (conn, jid) => {
   await conn.sendPresenceUpdate('composing', jid);
   let stopped = false;
@@ -19,7 +19,6 @@ const simulateTyping = async (conn, jid) => {
   };
 };
 
-// Emoji typing animation
 const animatedTyping = async (conn, jid, msgKey) => {
   const emojis = ["💭", "💬", "✍️"];
   let index = 0;
@@ -36,88 +35,93 @@ const animatedTyping = async (conn, jid, msgKey) => {
   };
 };
 
-// AI config state
 let AI_STATE = {
   IB: "false",
   GC: "false"
 };
 
-// Toggle AI
-cmd({
-  pattern: "chatbot",
-  alias: ["xylo"],
-  desc: "Enable or disable AI chatbot responses",
-  category: "ai",
-  filename: __filename,
-  react: "🤖"
-}, async (conn, mek, m, { from, args, isOwner, reply }) => {
-  if (!isOwner) return reply("❌ Only the bot owner can use this command.");
-  const mode = args[0]?.toLowerCase();
-  const target = args[1]?.toLowerCase();
-
-  if (mode === "on") {
-    if (!target || target === "all") {
-      AI_STATE.IB = "true";
-      AI_STATE.GC = "true";
-    } else if (target === "pm") {
-      AI_STATE.IB = "true";
-    } else if (target === "gc") {
-      AI_STATE.GC = "true";
-    }
-    await setConfig("AI_STATE", JSON.stringify(AI_STATE));
-    return reply("✅ Xylo AI enabled for " + (target || "all") + " chats.");
-  } else if (mode === "off") {
-    if (!target || target === "all") {
-      AI_STATE.IB = "false";
-      AI_STATE.GC = "false";
-    } else if (target === "pm") {
-      AI_STATE.IB = "false";
-    } else if (target === "gc") {
-      AI_STATE.GC = "false";
-    }
-    await setConfig("AI_STATE", JSON.stringify(AI_STATE));
-    return reply("❌ Xylo AI disabled for " + (target || "all") + " chats.");
-  } else {
-    return reply(`🤖 *Xylo AI Control Panel*
-
-📥 PM: ${AI_STATE.IB === "true" ? "✅ On" : "❌ Off"}
-👥 Group: ${AI_STATE.GC === "true" ? "✅ On" : "❌ Off"}
-
-Usage:
-${config.PREFIX}chatbot on|off all|pm|gc`);
-  }
-});
-
-// Load config on startup
+// Load saved state
 (async () => {
   const saved = await getConfig("AI_STATE");
   if (saved) AI_STATE = JSON.parse(saved);
 })();
 
-// Auto AI reply
+// Main chatbot command (menu with image)
+cmd({
+  pattern: "chatbot",
+  desc: "Control AI chatbot mode",
+  category: "ai",
+  filename: __filename,
+  react: "🤖"
+}, async (conn, mek, m, { reply, isOwner }) => {
+  if (!isOwner) return reply("❌ Only the bot owner can use this command.");
+
+  const imageUrl = 'https://i.postimg.cc/rFV2pJW5/IMG-20250603-WA0017.jpg';
+  const caption = `🤖 *Xylo AI Control Panel*
+
+📥 PM: ${AI_STATE.IB === "true" ? "✅ On" : "❌ Off"}
+👥 Group: ${AI_STATE.GC === "true" ? "✅ On" : "❌ Off"}
+
+Reply with:
+1 - Enable PM
+2 - Enable GC
+3 - Enable All
+4 - Disable All`;
+
+  await conn.sendMessage(m.chat, {
+    image: { url: imageUrl },
+    caption
+  }, { quoted: m });
+
+  const handler = async (res) => {
+    const choice = res.message?.conversation?.trim();
+    if (!["1", "2", "3", "4"].includes(choice)) return;
+
+    switch (choice) {
+      case "1": AI_STATE.IB = "true"; break;
+      case "2": AI_STATE.GC = "true"; break;
+      case "3": AI_STATE.IB = "true"; AI_STATE.GC = "true"; break;
+      case "4": AI_STATE.IB = "false"; AI_STATE.GC = "false"; break;
+    }
+
+    await setConfig("AI_STATE", JSON.stringify(AI_STATE));
+    await conn.sendMessage(m.chat, {
+      text: `✅ Xylo AI updated:
+
+📥 PM: ${AI_STATE.IB === "true" ? "✅ On" : "❌ Off"}
+👥 Group: ${AI_STATE.GC === "true" ? "✅ On" : "❌ Off"}`
+    }, { quoted: res });
+  };
+
+  conn.ev.once('messages.upsert', async ({ messages }) => {
+    const res = messages[0];
+    if (res.key?.remoteJid !== m.key.remoteJid || res.key.fromMe) return;
+    await handler(res);
+  });
+});
+
+// AI response handler
 cmd({
   on: "body"
-}, async (conn, m, store, { from, body, isGroup, sender, reply }) => {
+}, async (conn, m, store, { from, body, isGroup }) => {
   try {
-    if (!body || typeof body !== "string") return;
-    const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
-    const msgKey = m.key;
+    if (m.key.fromMe || body?.startsWith(config.PREFIX)) return;
 
+    const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
     const contextInfo = m?.message?.extendedTextMessage?.contextInfo || {};
     const isMentioned = contextInfo.mentionedJid?.includes(botJid);
-    const isQuoted = contextInfo.participant === botJid || contextInfo.stanzaId === msgKey.id;
+    const isQuoted = contextInfo.participant === botJid || contextInfo.stanzaId === m.key.id;
 
-    const isOwnerMessage = msgKey?.fromMe;
-    const isCmd = body.startsWith(config.PREFIX);
     const allowed = isGroup ? AI_STATE.GC === "true" : AI_STATE.IB === "true";
-    if (isOwnerMessage || isCmd || !allowed || (!isMentioned && !isQuoted && !isGroup)) return;
+    if (!allowed || (!isMentioned && !isQuoted && isGroup)) return;
 
-    // Draw image if starts with "draw "
+    const realSender = m.key.participant || m.key.remoteJid;
+    const userId = realSender.split("@")[0];
+
     if (body.toLowerCase().startsWith("draw ")) {
-      await conn.sendMessage(from, { react: { text: "🎨", key: msgKey } });
+      await conn.sendMessage(from, { react: { text: "🎨", key: m.key } });
       const prompt = body.slice(5).trim();
       const { data: draw } = await axios.post('https://xylo-ai.onrender.com/draw', { prompt });
-
       const imgPath = await downloadTempMedia(draw.imageUrl, 'xylo_img.jpg');
       await conn.sendMessage(from, {
         image: fs.readFileSync(imgPath),
@@ -127,29 +131,24 @@ cmd({
       return;
     }
 
-    // Simulate typing + emoji animation
-    const stopEmoji = await animatedTyping(conn, from, msgKey);
+    const stopEmoji = await animatedTyping(conn, from, m.key);
     const stopTyping = await simulateTyping(conn, from);
 
-    // AI response
-    const userId = sender.replace(/\D/g, ''); // 234818xxx...
     const res = await axios.post('https://xylo-ai.onrender.com/ask', {
       userId,
       message: body
     });
 
     const replyText = res.data?.reply;
-    if (replyText) {
-      await conn.sendMessage(from, { text: replyText }, { quoted: m });
-    } else {
-      await conn.sendMessage(from, { text: "⚠️ Xylo heard you, but couldn’t reply.", quoted: m });
-    }
+    await conn.sendMessage(from, {
+      text: replyText || "⚠️ I heard you, but couldn't generate a reply."
+    }, { quoted: m });
 
     stopTyping();
     stopEmoji();
 
   } catch (err) {
-    console.error("❌ AI Error:", err);
-    reply("⚠️ Xylo AI error occurred.");
+    console.error("❌ Xylo AI Error:", err);
+    await conn.sendMessage(from, { text: "⚠️ Xylo AI error occurred." }, { quoted: m });
   }
 });
