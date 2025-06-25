@@ -177,7 +177,7 @@ cmd({
 
       await conn.sendMessage(from, {
         audio: fs.readFileSync(voicePath),
-        mimetype: "audio/mp4",
+        mimetype: "audio/mp3",
         ptt: true
       }, { quoted: m });
 
