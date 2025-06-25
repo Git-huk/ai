@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { downloadTempMedia, cleanupTemp } = require("../lib/media-utils");
 
-// Typing simulator
+// Typing simulation
 const simulateTyping = async (conn, jid) => {
   await conn.sendPresenceUpdate('composing', jid);
   let stopped = false;
@@ -20,7 +20,7 @@ const simulateTyping = async (conn, jid) => {
   };
 };
 
-// Emoji typing animation
+// Emoji animation
 const animatedTyping = async (conn, jid, msgKey) => {
   const emojis = ["💭", "💬", "✍️"];
   let index = 0;
@@ -42,7 +42,7 @@ let AI_STATE = {
   GC: "false"
 };
 
-// Chatbot toggle
+// AI toggle command
 cmd({
   pattern: "chatbot",
   alias: ["xylo"],
@@ -88,13 +88,13 @@ ${config.PREFIX}chatbot on|off all|pm|gc`);
   }
 });
 
-// Load AI state
+// Load config
 (async () => {
   const saved = await getConfig("AI_STATE");
   if (saved) AI_STATE = JSON.parse(saved);
 })();
 
-// AI response handler
+// AI chat response handler
 cmd({
   on: "body"
 }, async (conn, m, store, { from, body, isGroup, sender, reply }) => {
@@ -126,24 +126,26 @@ cmd({
       return;
     }
 
-    // Typing + emoji
+    // Typing + emoji animation
     const stopEmoji = await animatedTyping(conn, from, m.key);
     const stopTyping = await simulateTyping(conn, from);
 
-    // AI chat
-    const userId = sender.split("@")[0];
+    // Clean userId
+    const cleanUserId = sender.replace(/@.+$/, '');
     const res = await axios.post('https://xylo-ai.onrender.com/ask', {
-      userId,
+      userId: cleanUserId,
       message: body
     });
 
-    console.log("🔎 AI Response:", res.data);
-
-    const replyText = res.data?.reply;
+    const replyText = String(res.data?.reply || "").trim();
     if (replyText) {
-      await conn.sendMessage(from, { text: replyText }, { quoted: m });
+      await conn.sendMessage(from, {
+        text: Buffer.from(replyText, 'utf-8').toString()
+      }, { quoted: m });
     } else {
-      await conn.sendMessage(from, { text: "⚠️ I heard you, but couldn't generate a reply.", quoted: m });
+      await conn.sendMessage(from, {
+        text: "⚠️ I heard you, but couldn't generate a reply."
+      }, { quoted: m });
     }
 
     stopTyping();
