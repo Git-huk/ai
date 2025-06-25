@@ -14,12 +14,13 @@ const simulateTyping = async (conn, jid, ms = 1500) => {
 
 let AI_STATE = { IB: "false", GC: "false" };
 
+// Load AI config
 (async () => {
   const saved = await getConfig("AI_STATE");
   if (saved) AI_STATE = JSON.parse(saved);
 })();
 
-// Control command
+// AI Chatbot mode control
 cmd({
   pattern: "chatbot",
   alias: ["xylo"],
@@ -104,7 +105,7 @@ Reply with:
   }
 });
 
-// AI Chat + Voice
+// AI Chat Handler
 cmd({
   on: "body"
 }, async (conn, m, store, { from, body, isGroup, sender, reply }) => {
@@ -116,22 +117,20 @@ cmd({
 
     const botJid = conn.user.id.split(":")[0] + "@s.whatsapp.net";
     const contextInfo = m.message?.extendedTextMessage?.contextInfo || {};
-    const mentionedJids = contextInfo?.mentionedJid || [];
+    const mentionedJids = contextInfo.mentionedJid || [];
     const isMentioned = mentionedJids.includes(botJid);
-    const isReplyToBot = contextInfo?.participant === botJid || contextInfo?.quotedMessage;
+    const isReplyToBot = contextInfo.participant === botJid;
 
-    const shouldRespond = isGroup
-      ? isMentioned || isReplyToBot
-      : isReplyToBot;
+    const isAudio = !!m.message.audioMessage;
+    const isDraw = body?.toLowerCase().startsWith("draw ");
+    const isSay = body?.toLowerCase().includes("say it");
 
-    if (!shouldRespond) return;
+    // Strict: only respond if tagged, replied, or mentioned
+    if (!(isMentioned || isReplyToBot)) return;
 
     let promptText = body;
-    const isAudio = !!m.message.audioMessage;
-    const wantVoice = isAudio || body.toLowerCase().includes("say ");
 
-    // 🎨 Draw command
-    if (body.toLowerCase().startsWith("draw ")) {
+    if (isDraw) {
       const prompt = body.slice(5).trim();
       const { data: draw } = await axios.post('https://xylo-ai.onrender.com/draw', { prompt });
       const imgPath = await downloadTempMedia(draw.imageUrl, 'xylo_img.jpg');
@@ -159,30 +158,34 @@ cmd({
     if (!data?.reply) return reply("No reply from Xylo.");
     await conn.sendMessage(from, { text: data.reply }, { quoted: m });
 
-    if (wantVoice) {
-      const voiceRes = await axios.post("https://xylo-ai.onrender.com/voice", {
-        text: data.reply
-      });
+    if (isAudio || isSay) {
+      try {
+        const { data: voiceData } = await axios.post("https://xylo-ai.onrender.com/voice", {
+          text: data.reply
+        });
 
-      const voiceUrl = voiceRes.data.audioUrl;
-      const voicePath = path.join(__dirname, "../tmp/xylo_voice.mp3");
-      const stream = await axios.get(voiceUrl, { responseType: "stream" });
-      const writer = fs.createWriteStream(voicePath);
-      stream.data.pipe(writer);
+        const filePath = path.join(__dirname, '../tmp/xylo_voice.mp3');
+        const writer = fs.createWriteStream(filePath);
+        const stream = await axios.get(voiceData.audioUrl, { responseType: "stream" });
+        stream.data.pipe(writer);
 
-      await new Promise((resolve, reject) => {
-        writer.on("finish", resolve);
-        writer.on("error", reject);
-      });
+        await new Promise((res, rej) => {
+          writer.on("finish", res);
+          writer.on("error", rej);
+        });
 
-      await conn.sendMessage(from, {
-        audio: fs.readFileSync(voicePath),
-        mimetype: "audio/mp3",
-        ptt: true
-      }, { quoted: m });
+        await conn.sendMessage(from, {
+          audio: fs.readFileSync(filePath),
+          mimetype: "audio/mp3",
+          ptt: true
+        }, { quoted: m });
 
-      fs.unlinkSync(voicePath);
+        fs.unlinkSync(filePath);
+      } catch (e) {
+        console.error("Voice error:", e.message);
+      }
     }
+
   } catch (err) {
     console.error("Xylo AI error:", err);
     reply("Xylo AI error occurred.");
