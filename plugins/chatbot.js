@@ -3,10 +3,9 @@ const { cmd } = require('../command');
 const config = require("../config");
 const { setConfig, getConfig } = require("../lib/configdb");
 const fs = require('fs');
-const path = require('path');
 const { downloadTempMedia, cleanupTemp } = require("../lib/media-utils");
 
-// Typing simulation
+// Typing simulator
 const simulateTyping = async (conn, jid) => {
   await conn.sendPresenceUpdate('composing', jid);
   let stopped = false;
@@ -20,7 +19,7 @@ const simulateTyping = async (conn, jid) => {
   };
 };
 
-// Emoji animation
+// Emoji typing animation
 const animatedTyping = async (conn, jid, msgKey) => {
   const emojis = ["💭", "💬", "✍️"];
   let index = 0;
@@ -37,12 +36,13 @@ const animatedTyping = async (conn, jid, msgKey) => {
   };
 };
 
+// AI config state
 let AI_STATE = {
   IB: "false",
   GC: "false"
 };
 
-// AI toggle command
+// Toggle AI
 cmd({
   pattern: "chatbot",
   alias: ["xylo"],
@@ -88,32 +88,33 @@ ${config.PREFIX}chatbot on|off all|pm|gc`);
   }
 });
 
-// Load config
+// Load config on startup
 (async () => {
   const saved = await getConfig("AI_STATE");
   if (saved) AI_STATE = JSON.parse(saved);
 })();
 
-// AI chat response handler
+// Auto AI reply
 cmd({
   on: "body"
 }, async (conn, m, store, { from, body, isGroup, sender, reply }) => {
   try {
-    if (m.key.fromMe || body?.startsWith(config.PREFIX)) return;
-
+    if (!body || typeof body !== "string") return;
     const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net';
+    const msgKey = m.key;
+
     const contextInfo = m?.message?.extendedTextMessage?.contextInfo || {};
-
     const isMentioned = contextInfo.mentionedJid?.includes(botJid);
-    const isQuoted = contextInfo.participant === botJid || contextInfo.stanzaId === m.key.id;
+    const isQuoted = contextInfo.participant === botJid || contextInfo.stanzaId === msgKey.id;
 
+    const isOwnerMessage = msgKey?.fromMe;
+    const isCmd = body.startsWith(config.PREFIX);
     const allowed = isGroup ? AI_STATE.GC === "true" : AI_STATE.IB === "true";
-    if (!allowed || (!isMentioned && !isQuoted)) return;
+    if (isOwnerMessage || isCmd || !allowed || (!isMentioned && !isQuoted && !isGroup)) return;
 
-    // DRAW command
+    // Draw image if starts with "draw "
     if (body.toLowerCase().startsWith("draw ")) {
-      await conn.sendMessage(from, { react: { text: "🎨", key: m.key } });
-
+      await conn.sendMessage(from, { react: { text: "🎨", key: msgKey } });
       const prompt = body.slice(5).trim();
       const { data: draw } = await axios.post('https://xylo-ai.onrender.com/draw', { prompt });
 
@@ -126,26 +127,22 @@ cmd({
       return;
     }
 
-    // Typing + emoji animation
-    const stopEmoji = await animatedTyping(conn, from, m.key);
+    // Simulate typing + emoji animation
+    const stopEmoji = await animatedTyping(conn, from, msgKey);
     const stopTyping = await simulateTyping(conn, from);
 
-    // Clean userId
-    const cleanUserId = sender.replace(/@.+$/, '');
+    // AI response
+    const userId = sender.replace(/\D/g, ''); // 234818xxx...
     const res = await axios.post('https://xylo-ai.onrender.com/ask', {
-      userId: cleanUserId,
+      userId,
       message: body
     });
 
-    const replyText = String(res.data?.reply || "").trim();
+    const replyText = res.data?.reply;
     if (replyText) {
-      await conn.sendMessage(from, {
-        text: Buffer.from(replyText, 'utf-8').toString()
-      }, { quoted: m });
+      await conn.sendMessage(from, { text: replyText }, { quoted: m });
     } else {
-      await conn.sendMessage(from, {
-        text: "⚠️ I heard you, but couldn't generate a reply."
-      }, { quoted: m });
+      await conn.sendMessage(from, { text: "⚠️ Xylo heard you, but couldn’t reply.", quoted: m });
     }
 
     stopTyping();
