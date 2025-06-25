@@ -3,7 +3,14 @@ const { cmd } = require('../command');
 const config = require("../config");
 const { setConfig, getConfig } = require("../lib/configdb");
 const fs = require('fs');
+const path = require('path');
 const { downloadTempMedia, cleanupTemp } = require("../lib/media-utils");
+
+const simulateTyping = async (conn, jid, ms = 1500) => {
+  await conn.sendPresenceUpdate('composing', jid);
+  await new Promise(resolve => setTimeout(resolve, ms));
+  await conn.sendPresenceUpdate('paused', jid);
+};
 
 let AI_STATE = { IB: "false", GC: "false" };
 
@@ -17,6 +24,7 @@ let AI_STATE = { IB: "false", GC: "false" };
 cmd({
   pattern: "chatbot",
   alias: ["xylo"],
+  react: "🤖",
   desc: "Control Xylo AI Chatbot mode",
   category: "ai",
   filename: __filename
@@ -113,21 +121,25 @@ cmd({
     const mentionedJids = contextInfo?.mentionedJid || [];
     const isMentioned = mentionedJids.includes(botJid);
     const isReplyToBot = contextInfo?.participant === botJid;
-    const isAudio = !!m.message.audioMessage;
 
-    const shouldRespond =
-      !isGroup ||
-      isMentioned ||
-      isReplyToBot ||
-      body.toLowerCase().includes("say it") ||
-      body.toLowerCase().startsWith("draw ");
+    const bodyText = body?.toLowerCase() || "";
+    const isDraw = bodyText.startsWith("draw ");
+    const isSayIt = bodyText.includes("say it");
+    const isTrigger = isDraw || isSayIt;
 
+    const shouldRespond = isMentioned || isReplyToBot || (isTrigger && (isMentioned || isReplyToBot));
     if (!shouldRespond) return;
 
     let promptText = body;
+    const isAudio = !!m.message.audioMessage;
 
-    // Image generation
-    if (body.toLowerCase().startsWith("draw ")) {
+    if (isAudio) {
+      const audioPath = await conn.downloadAndSaveMediaMessage(m, "./tmp/voice.ogg");
+      promptText = "Hello";
+      fs.unlinkSync(audioPath);
+    }
+
+    if (isDraw) {
       const prompt = body.slice(5).trim();
       const { data: draw } = await axios.post('https://xylo-ai.onrender.com/draw', { prompt });
       const imgPath = await downloadTempMedia(draw.imageUrl, 'xylo_img.jpg');
@@ -139,11 +151,7 @@ cmd({
       return;
     }
 
-    if (isAudio) {
-      const audioPath = await conn.downloadAndSaveMediaMessage(m, "./tmp/voice.ogg");
-      promptText = "Hello";
-      fs.unlinkSync(audioPath);
-    }
+    await simulateTyping(conn, from, Math.floor(Math.random() * 1500) + 1000);
 
     const { data } = await axios.post("https://xylo-ai.onrender.com/ask", {
       userId: sender.split("@")[0],
@@ -154,7 +162,7 @@ cmd({
 
     await conn.sendMessage(from, { text: data.reply }, { quoted: m });
 
-    if (isAudio || body.toLowerCase().includes("say it")) {
+    if (isSayIt || isAudio) {
       const { data: voiceData } = await axios.post("https://xylo-ai.onrender.com/voice", {
         text: data.reply
       });
