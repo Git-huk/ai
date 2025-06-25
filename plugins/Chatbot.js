@@ -3,20 +3,11 @@ const { cmd } = require('../command');
 const config = require("../config");
 const { setConfig, getConfig } = require("../lib/configdb");
 const fs = require('fs');
-const path = require('path');
 const { downloadTempMedia, cleanupTemp } = require("../lib/media-utils");
 
-// Simulate typing
-const simulateTyping = async (conn, jid, ms = 1500) => {
-  await conn.sendPresenceUpdate('composing', jid);
-  await new Promise(resolve => setTimeout(resolve, ms));
-  await conn.sendPresenceUpdate('paused', jid);
-};
-
-// State config
 let AI_STATE = { IB: "false", GC: "false" };
 
-// Load previous config on startup
+// Load AI config
 (async () => {
   const saved = await getConfig("AI_STATE");
   if (saved) AI_STATE = JSON.parse(saved);
@@ -26,7 +17,6 @@ let AI_STATE = { IB: "false", GC: "false" };
 cmd({
   pattern: "chatbot",
   alias: ["xylo"],
-  react: "🤖",
   desc: "Control Xylo AI Chatbot mode",
   category: "ai",
   filename: __filename
@@ -96,7 +86,7 @@ Reply with:
     return;
   }
 
-  // Fallback
+  // Argument fallback
   const modeArg = args[0].toLowerCase();
   if (["pm", "gc", "all", "off"].includes(modeArg)) {
     AI_STATE.IB = ["pm", "all"].includes(modeArg) ? "true" : "false";
@@ -108,7 +98,7 @@ Reply with:
   }
 });
 
-// AI Chat Response
+// AI Chat Response Handler
 cmd({
   on: "body"
 }, async (conn, m, store, { from, body, isGroup, sender, reply }) => {
@@ -125,16 +115,19 @@ cmd({
     const isReplyToBot = contextInfo?.participant === botJid;
     const isAudio = !!m.message.audioMessage;
 
-    const isDraw = body.toLowerCase().startsWith("draw ");
-    const isSayIt = body.toLowerCase().includes("say it");
+    const shouldRespond =
+      !isGroup ||
+      isMentioned ||
+      isReplyToBot ||
+      body.toLowerCase().includes("say it") ||
+      body.toLowerCase().startsWith("draw ");
 
-    const shouldRespond = !isGroup || isMentioned || isReplyToBot || isAudio || isSayIt || isDraw;
     if (!shouldRespond) return;
 
     let promptText = body;
 
-    // 🎨 Draw image
-    if (isDraw) {
+    // Image generation
+    if (body.toLowerCase().startsWith("draw ")) {
       const prompt = body.slice(5).trim();
       const { data: draw } = await axios.post('https://xylo-ai.onrender.com/draw', { prompt });
       const imgPath = await downloadTempMedia(draw.imageUrl, 'xylo_img.jpg');
@@ -146,17 +139,14 @@ cmd({
       return;
     }
 
-    // 🎙️ Audio fallback
     if (isAudio) {
       const audioPath = await conn.downloadAndSaveMediaMessage(m, "./tmp/voice.ogg");
       promptText = "Hello";
       fs.unlinkSync(audioPath);
     }
 
-    await simulateTyping(conn, from);
-
     const { data } = await axios.post("https://xylo-ai.onrender.com/ask", {
-      userId: sender,
+      userId: sender.split("@")[0],
       message: promptText
     });
 
@@ -164,28 +154,16 @@ cmd({
 
     await conn.sendMessage(from, { text: data.reply }, { quoted: m });
 
-    if (isAudio || isSayIt) {
+    if (isAudio || body.toLowerCase().includes("say it")) {
       const { data: voiceData } = await axios.post("https://xylo-ai.onrender.com/voice", {
         text: data.reply
       });
 
-      const filePath = path.join(__dirname, '../tmp/xylo_voice.mp3');
-      const writer = fs.createWriteStream(filePath);
-      const stream = await axios.get(voiceData.audioUrl, { responseType: "stream" });
-      stream.data.pipe(writer);
-
-      await new Promise((res, rej) => {
-        writer.on("finish", res);
-        writer.on("error", rej);
-      });
-
       await conn.sendMessage(from, {
-        audio: fs.readFileSync(filePath),
-        mimetype: "audio/mp4",
+        audio: { url: voiceData.audioUrl },
+        mimetype: "audio/mp3",
         ptt: true
       }, { quoted: m });
-
-      fs.unlinkSync(filePath);
     }
   } catch (err) {
     console.error("Xylo AI error:", err);
