@@ -14,13 +14,13 @@ const simulateTyping = async (conn, jid, ms = 2000) => {
 
 let AI_STATE = { IB: "false", GC: "false" };
 
-// Load config on startup
+// Load state from config
 (async () => {
   const saved = await getConfig("AI_STATE");
   if (saved) AI_STATE = JSON.parse(saved);
 })();
 
-// Smart reply-menu style chatbot control
+// Smart chatbot mode command
 cmd({
   pattern: "chatbot",
   alias: ["xylo"],
@@ -55,7 +55,7 @@ Reply with:
     const handler = async (msgData) => {
       try {
         const receivedMsg = msgData.messages?.[0];
-        if (!receivedMsg?.message || !receivedMsg.key?.remoteJid) return;
+        if (!receivedMsg?.message || !receivedMsg.key.remoteJid) return;
 
         const stanzaId = receivedMsg.message?.extendedTextMessage?.contextInfo?.stanzaId;
         if (stanzaId !== messageID) return;
@@ -98,13 +98,11 @@ Reply with:
     };
 
     conn.ev.on("messages.upsert", handler);
-
-    // Auto cleanup after 10 minutes
     setTimeout(() => conn.ev.off("messages.upsert", handler), 10 * 60 * 1000);
     return;
   }
 
-  // Text argument version fallback
+  // Direct text-based control
   const modeArg = args[0]?.toLowerCase();
   if (["pm", "gc", "all", "off"].includes(modeArg)) {
     if (modeArg === "pm") {
@@ -123,7 +121,7 @@ Reply with:
   }
 });
 
-// 🤖 AI Chat Handler
+// Auto-responder AI handler
 cmd({
   on: "body"
 }, async (conn, m, store, { from, body, isGroup, sender, reply }) => {
@@ -133,17 +131,26 @@ cmd({
     const allowed = isGroup ? AI_STATE.GC === "true" : AI_STATE.IB === "true";
     if (!allowed) return;
 
-    const botJid = conn.user.id.split(":")[0] + "@s.whatsapp.net";
-    const isMentioned = body.toLowerCase().includes("say it") ||
-                        m?.message?.extendedTextMessage?.contextInfo?.mentionedJid?.includes(botJid) ||
-                        m?.message?.extendedTextMessage?.contextInfo?.participant === botJid;
+    const botJid = conn?.user?.id?.split(":")[0] + "@s.whatsapp.net";
 
+    const contextInfo = m?.message?.extendedTextMessage?.contextInfo || {};
+    const mentionedJids = contextInfo?.mentionedJid || [];
+    const isMentioned = mentionedJids.includes(botJid);
+    const isReplyToBot = contextInfo?.participant === botJid;
     const isAudio = !!m.message.audioMessage;
-    if (!isAudio && !isMentioned && isGroup) return;
+
+    const shouldRespond =
+      !isGroup ||
+      isMentioned ||
+      isReplyToBot ||
+      body.toLowerCase().includes("say it") ||
+      body.toLowerCase().startsWith("draw ");
+
+    if (!shouldRespond) return;
 
     let promptText = body;
 
-    // 🖼️ Draw image
+    // Draw image
     if (body.toLowerCase().startsWith("draw ")) {
       const prompt = body.slice(5).trim();
       const { data: draw } = await axios.post('https://xylo-ai.onrender.com/draw', { prompt });
@@ -156,17 +163,15 @@ cmd({
       return;
     }
 
-    // 🧠 Voice prompt (transcription skipped)
+    // Voice fallback
     if (isAudio) {
       const audioPath = await conn.downloadAndSaveMediaMessage(m, "./tmp/voice.ogg");
-      promptText = "Hello"; // fallback text
+      promptText = "Hello"; // fallback
       fs.unlinkSync(audioPath);
     }
 
-    // ⌨️ Typing simulation
-    await simulateTyping(conn, from, Math.floor(Math.random() * 1500) + 1500);
+    await simulateTyping(conn, from, Math.floor(Math.random() * 1000) + 1000);
 
-    // 🧠 Get AI response
     const { data } = await axios.post("https://xylo-ai.onrender.com/ask", {
       userId: sender.split("@")[0],
       message: promptText
@@ -176,7 +181,7 @@ cmd({
 
     await conn.sendMessage(from, { text: data.reply, ai: true }, { quoted: m });
 
-    // 🔊 Voice response if requested
+    // Voice reply
     if (isAudio || body.toLowerCase().includes("say it")) {
       const { data: voiceData } = await axios.post("https://xylo-ai.onrender.com/voice", {
         text: data.reply
@@ -201,7 +206,7 @@ cmd({
       fs.unlinkSync(filePath);
     }
   } catch (err) {
-    console.error("Chatbot error:", err);
-    reply("⚠️ Error occurred while using Xylo AI.");
+    console.error("Xylo AI error:", err);
+    reply("⚠️ Xylo AI error occurred.");
   }
 });
