@@ -128,7 +128,7 @@ cmd({
 
     let promptText = body;
     const isAudio = !!m.message.audioMessage;
-    const wantVoice = isAudio || body.toLowerCase().includes("say it");
+    const wantVoice = isAudio || body.toLowerCase().includes("say ");
 
     // 🎨 Draw command
     if (body.toLowerCase().startsWith("draw ")) {
