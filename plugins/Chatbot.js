@@ -14,79 +14,113 @@ const simulateTyping = async (conn, jid, ms = 2000) => {
 
 let AI_STATE = { IB: "false", GC: "false" };
 
-// Load AI state on startup
+// Load config on startup
 (async () => {
   const saved = await getConfig("AI_STATE");
   if (saved) AI_STATE = JSON.parse(saved);
 })();
 
-// 📥 /chatbot interactive command (with smart menu)
+// Smart reply-menu style chatbot control
 cmd({
   pattern: "chatbot",
   alias: ["xylo"],
-  desc: "Control AI chatbot mode",
+  react: "🤖",
+  desc: "Control Xylo AI Chatbot mode",
   category: "ai",
-  filename: __filename,
-  react: "🤖"
-}, async (conn, mek, m, { from, isOwner, reply }) => {
+  filename: __filename
+}, async (conn, mek, m, { from, args, isOwner, reply }) => {
   if (!isOwner) return reply("❌ Only the bot owner can use this command.");
 
-  const text = `> *Xylo AI Chatbot Settings*
+  if (!args[0]) {
+    const text = `> *𝐗𝐲𝐥𝐨 𝐀𝐈 𝐂𝐡𝐚𝐭𝐛𝐨𝐭 𝐌𝐨𝐝𝐞𝐬*\n
+> PM Status: ${AI_STATE.IB === "true" ? "✅ Enabled" : "❌ Disabled"}
+> Group Status: ${AI_STATE.GC === "true" ? "✅ Enabled" : "❌ Disabled"}\n
+Reply with:
+*1.* Enable for PM Only
+*2.* Enable for Groups Only
+*3.* Enable for All
+*4.* Disable All
 
-Current Status:
-📥 PM: ${AI_STATE.IB === "true" ? "✅ Enabled" : "❌ Disabled"}
-👥 Group: ${AI_STATE.GC === "true" ? "✅ Enabled" : "❌ Disabled"}
+╭─────────────
+│ *𝚙𝚘𝚠𝚎𝚛𝚎𝚍 𝚋𝚢 𝙳𝚊𝚟𝚒𝚍 𝚇*
+╰──────────────◆`;
 
-_Reply with:_
-1. Enable for PM only
-2. Enable for Groups only
-3. Enable for All
-4. Disable All`;
+    const sentMsg = await conn.sendMessage(from, {
+      image: { url: "https://i.postimg.cc/rFV2pJW5/IMG-20250603-WA0017.jpg" },
+      caption: text
+    }, { quoted: mek });
 
-  const sentMsg = await conn.sendMessage(from, {
-    image: { url: "https://i.postimg.cc/rFV2pJW5/IMG-20250603-WA0017.jpg" },
-    caption: text
-  }, { quoted: mek });
+    const messageID = sentMsg.key.id;
 
-  const messageID = sentMsg.key.id;
+    const handler = async (msgData) => {
+      try {
+        const receivedMsg = msgData.messages?.[0];
+        if (!receivedMsg?.message || !receivedMsg.key?.remoteJid) return;
 
-  const handler = async (msgData) => {
-    try {
-      const msg = msgData.messages?.[0];
-      if (!msg?.message) return;
+        const stanzaId = receivedMsg.message?.extendedTextMessage?.contextInfo?.stanzaId;
+        if (stanzaId !== messageID) return;
 
-      const isReply = msg.message?.extendedTextMessage?.contextInfo?.stanzaId === messageID;
-      if (!isReply) return;
+        const replyText = receivedMsg.message?.conversation ||
+                          receivedMsg.message?.extendedTextMessage?.text || "";
 
-      const userText = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
-      const jid = msg.key.remoteJid;
+        const sender = receivedMsg.key.remoteJid;
+        let statusText = "";
 
-      let response = "";
-      switch (userText.trim()) {
-        case "1":
-          AI_STATE.IB = "true"; AI_STATE.GC = "false"; response = "✅ Enabled for PM only"; break;
-        case "2":
-          AI_STATE.IB = "false"; AI_STATE.GC = "true"; response = "✅ Enabled for Groups only"; break;
-        case "3":
-          AI_STATE.IB = "true"; AI_STATE.GC = "true"; response = "✅ Enabled for All Chats"; break;
-        case "4":
-          AI_STATE.IB = "false"; AI_STATE.GC = "false"; response = "❌ Disabled in All Chats"; break;
-        default:
-          await conn.sendMessage(jid, { text: "⚠️ Invalid option. Use 1 to 4 only." }, { quoted: msg });
+        if (replyText === "1") {
+          AI_STATE.IB = "true"; AI_STATE.GC = "false";
+          statusText = "✅ Xylo AI enabled for *PM only*.";
+        } else if (replyText === "2") {
+          AI_STATE.IB = "false"; AI_STATE.GC = "true";
+          statusText = "✅ Xylo AI enabled for *Groups only*.";
+        } else if (replyText === "3") {
+          AI_STATE.IB = "true"; AI_STATE.GC = "true";
+          statusText = "✅ Xylo AI enabled for *All chats*.";
+        } else if (replyText === "4") {
+          AI_STATE.IB = "false"; AI_STATE.GC = "false";
+          statusText = "❌ Xylo AI disabled for all chats.";
+        } else {
+          await conn.sendMessage(sender, {
+            text: "❌ Invalid option. Please reply with 1, 2, 3 or 4."
+          }, { quoted: receivedMsg });
           return;
+        }
+
+        await setConfig("AI_STATE", JSON.stringify(AI_STATE));
+
+        await conn.sendMessage(sender, {
+          text: statusText
+        }, { quoted: receivedMsg });
+
+        conn.ev.off("messages.upsert", handler);
+      } catch (err) {
+        console.error("Chatbot reply-menu error:", err);
       }
+    };
 
-      await setConfig("AI_STATE", JSON.stringify(AI_STATE));
-      await conn.sendMessage(jid, { text: response }, { quoted: msg });
+    conn.ev.on("messages.upsert", handler);
 
-      conn.ev.off("messages.upsert", handler);
-    } catch (err) {
-      console.error("AI Menu Error:", err);
+    // Auto cleanup after 10 minutes
+    setTimeout(() => conn.ev.off("messages.upsert", handler), 10 * 60 * 1000);
+    return;
+  }
+
+  // Text argument version fallback
+  const modeArg = args[0]?.toLowerCase();
+  if (["pm", "gc", "all", "off"].includes(modeArg)) {
+    if (modeArg === "pm") {
+      AI_STATE.IB = "true"; AI_STATE.GC = "false";
+    } else if (modeArg === "gc") {
+      AI_STATE.IB = "false"; AI_STATE.GC = "true";
+    } else if (modeArg === "all") {
+      AI_STATE.IB = "true"; AI_STATE.GC = "true";
+    } else if (modeArg === "off") {
+      AI_STATE.IB = "false"; AI_STATE.GC = "false";
     }
-  };
-
-  conn.ev.on("messages.upsert", handler);
-  setTimeout(() => conn.ev.off("messages.upsert", handler), 10 * 60 * 1000); // Clean up after 10 mins
+    await setConfig("AI_STATE", JSON.stringify(AI_STATE));
+    return reply(`✅ Xylo AI mode updated to: *${modeArg.toUpperCase()}*`);
+  } else {
+    return reply("❌ Invalid mode. Use: `.chatbot pm`, `.chatbot gc`, `.chatbot all`, `.chatbot off`");
+  }
 });
 
 // 🤖 AI Chat Handler
