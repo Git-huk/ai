@@ -1,7 +1,7 @@
 {
   "name": "XBOT-MD",
   "version": "2.0.9",
-  "description": "NOT THE BEST BOT IN THE UNIVERSE, BUT ENJOYMENT US PROMISING",
+  "description": "NOT THE BEST BOT IN THE UNIVERSE, BUT ENJOYMENT IS PROMISING",
   "main": "index.js",
   "engines": {
     "node": ">=20.x",
@@ -19,6 +19,7 @@
     "@dark-yasiya/scrap": "1.0.1",
     "@dark-yasiya/yt-dl.js": "latest",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@chatgptweb/chatgpt-api" :"latest",
     "@mrnima/facebook-downloader": "1.0.0",
     "@mrnima/tiktok-downloader": "1.0.0",
     "@vitalets/google-translate-api": "^9.2.0",
@@ -26,7 +27,7 @@
     "adm-zip": "^0.5.16",
     "api-dylux": "1.8.5",
     "btch-downloader": "^2.2.9",
-    "better-sqlite3": "*",
+    "better-sqlite3": "npm:libsql@0.5.12",
     "buffer": "^6.0.3",
     "canvacord": "^5.4.9",
     "cheerio": "^1.0.0-rc.12",
@@ -55,16 +56,18 @@
     "pdf-lib": "^1.17.1",
     "pdfkit": "^0.14.0",
     "pino": "^7.0.5",
-    "pm2": "^6.0.6",
+    "openai":"latest",
+    "pm2": "latest",
     "qrcode-reader": "^1.0.4",
     "qrcode-terminal": "^0.12.0",
     "ruhend-scraper": "8.0.3",
     "sequelize": "^6.37.5",
     "sqlite3": "latest",
     "util": "^0.12.4",
-    "vm": "^0.1.0",
+    "vm2": "^3.9.17",
     "wa-sticker-formatter": "^4.4.4",
     "wa_set_pkg": "1.0.5",
-    "yt-search": "2.11.1"
+    "@octokit/rest": "^20.0.0",
+    "yt-search": "*"
   }
 }
